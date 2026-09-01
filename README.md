@@ -1,103 +1,107 @@
 # PlanOnIt
 
-**A shared planning workspace where an external agent assembles a complete evening and a human stays in control.**
+PlanOnIt is a shared evening-planning workspace for a person and an external WebMCP agent. It coordinates a restaurant slot, an exact movie showtime, venue-to-venue transport, chronology, and a total budget in one versioned plan.
 
-PlanOnIt is a polished WebMCP challenge demo for planning dinner, a movie, and transport across Dhaka. A person can browse and edit normally; a WebMCP-compatible external agent can discover the same capabilities, compare services, build a constraint-aware draft, and adapt it after a human edit.
+The key interaction is repair, not just generation: an agent can create a feasible plan, a person can change one choice in the UI, and `repair_plan` can preserve that choice while recomputing dependent selections. The person alone approves the current valid version. Reservation is a clearly labeled local simulation.
 
-## Why WebMCP
-
-Traditional UI makes a person repeat the same search-and-compare loop across services. PlanOnIt exposes meaningful, typed tools at the capability boundary: an agent can start with “three people in Dhaka, Friday, under ৳5,000,” inspect options, assemble a plan, calculate the budget, and update one selection. The website remains the shared source of truth. Reservation is always a simulated draft and requires explicit human approval.
-
-## WebMCP tools
-
-The app uses the imperative API `document.modelContext.registerTool({ name, description, inputSchema, annotations, execute })`. It registers eight tools when the page loads:
-
-| Tool | Purpose |
-|---|---|
-| `search_restaurants` | Filter realistic seeded restaurants by city, cuisine, rating, and price. |
-| `find_showtimes` | Find date-and-seat-compatible movies and showtimes. |
-| `estimate_ride` | Compare deterministic fare and travel-time estimates. |
-| `create_evening_plan` | Assemble a coherent draft from goal, date, party size, budget, and preferences. |
-| `get_current_plan` | Read the shared plan and budget status. |
-| `update_plan` | Change selections by IDs without booking. |
-| `calculate_total_cost` | Return line items, total, remaining budget, and status. |
-| `reserve_plan` | Prepare a simulated reservation only after UI approval and exact confirmation. |
-
-## Canonical demo
-
-Open the app in a WebMCP-enabled Chrome environment. Ask the external agent: “Plan Friday evening, September 4, in Dhaka for 3 people. Dinner and a movie, under ৳5,000, highly rated.” The agent should call `create_evening_plan`, then `get_current_plan` or `calculate_total_cost`. In the UI, change the restaurant under **Explore**. Ask the agent to use `search_restaurants` and `update_plan` to find a cheaper dinner. Return to **My plan**, review the timeline, and click **Review & approve**. The `reserve_plan` tool will only return a simulated reservation-ready response after that approval.
-
-## Human and agent interaction
-
-The Overview screen is a human-first dashboard. Explore provides manual selection. My plan shows a timeline, cost breakdown, budget meter, approval gate, and shared activity trace. WebMCP actions and manual edits update the same React state, making the hybrid workflow visible without a fake chatbot.
-
-## Architecture and local setup
-
-This is a Vite + React + TypeScript single-page app. `src/data.ts` is deterministic demo data; `src/domain.ts` is the replaceable business/data-access layer; `src/tools.ts` owns WebMCP schemas and execution; `src/main.tsx` and `src/styles.css` are the UI layer. No credentials or external API are required.
+## Run it
 
 ```bash
 npm install
 npm run dev
 ```
 
-For a normal development session, use the URL printed by Vite. The root `index.html` is also a standalone, double-clickable production entry: run `npm run build` once, then open `/Users/tonmoy/Documents/PlanOnIt/index.html` directly. Its bundled assets use relative paths and do not require a server.
-
-Build and test:
+Open the URL printed by Vite. For a production build:
 
 ```bash
-npm run test
 npm run build
 npm run preview
 ```
 
-There are no environment variables and no database migration. The local seeded layer is intentionally stable for judging and can be replaced behind `domain.ts` with a real backend later.
+`npm run build` also regenerates the root [`index.html`](index.html) as a single file with inlined CSS and JavaScript. The committed file can be opened directly without a server; it does not fetch `file://` module assets.
 
-## Judge testing
+Quality checks:
 
-1. Run the app and open the printed local URL in a browser with WebMCP support enabled.
-2. Confirm the green **WebMCP active · 8 tools** indicator.
-3. Use the Overview → **Ask your agent** flow, or connect an external WebMCP agent and run the canonical prompt above.
-4. Verify the shared plan, cost, activity trace, manual restaurant edit, agent update, and approval gate.
-5. Try a small budget to confirm the over-budget state. Try an invalid ID through `update_plan` to confirm a structured error.
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm audit --omit=dev
+```
 
-## Security and limitations
+## WebMCP workflow
 
-All records are seeded demo data. Prices, availability, and rides are simulated; no real booking or payment occurs. Inputs have JSON schemas and domain ID checks, state-changing tools explicitly reset approval, and the consequential reservation tool requires both exact confirmation and prior human approval. The app does not claim a live URL, repository, deployment, or uploaded demo video until those external actions are actually performed.
+PlanOnIt uses the imperative `document.modelContext.registerTool` API described in the [official WebMCP documentation](https://learn.chatgpt.com/docs/webmcp). The supported ChatGPT desktop browser discovers the tools from the live page, and tool mutations update the same persisted React state as human edits.
 
-## Demo video plan (under 3 minutes)
+Canonical prompt:
 
-**0:00–0:15 Hook:** “Planning a night out means repeating the same search across three services. PlanOnIt gives an external agent one shared workspace.” Show Overview.
+> Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use create_evening_plan, show feasibility evidence, and never approve for me.
 
-**0:15–0:40 Human flow:** Browse Explore, add dinner, movie, and transport. Show the plan timeline and total.
+The page reports registration honestly:
 
-**0:40–1:30 Agent flow:** In a WebMCP-enabled agent, say the canonical prompt. Show tool discovery and the calls to assemble the plan and calculate the budget. Show the plan updating in the UI.
+- `WebMCP active · 12 tools` only after every registration promise resolves.
+- `WebMCP unavailable in this browser` when the API is absent.
+- `WebMCP registration failed` when registration rejects.
 
-**1:30–2:05 Hybrid handoff:** Manually swap the restaurant. Ask the agent to find a cheaper option and update the shared plan. Show the activity trace and total changing.
+The local **Quick Planner** runs the same deterministic solver for manual testing, but is never presented as an agent or WebMCP execution.
 
-**2:05–2:35 Control and close:** Open My plan, show the approval gate, approve the draft, and explain that reservation is still simulated. “WebMCP makes the site legible to agents; PlanOnIt makes the result useful to people.”
+## Site tools
 
-Record browser audio narration and the app screen at 1080p. Before export, check that the full tool names are readable, the final approval is visible, no credentials appear, and the runtime stays under three minutes. No video has been uploaded by this repository.
+| Tool | Behavior |
+|---|---|
+| `search_restaurants` | Filters by date, party size, cuisine, rating, price, and remaining table capacity. |
+| `get_restaurant_details` | Returns one restaurant’s location, hours, limits, price, and availability inventory. |
+| `check_restaurant_availability` | Checks exact date/party capacity and returns valid slots. |
+| `find_showtimes` | Returns atomic movie/showtime pairs with date, cinema, seats, duration, and ticket price. |
+| `estimate_transport` | Returns only known venue-to-venue routes with route-specific fares and durations. |
+| `create_evening_plan` | Searches and ranks restaurant slot × showtime × route option combinations. |
+| `get_current_plan` | Reads the shared version, entities, selections, evidence, approval, and reservation state. |
+| `validate_plan` | Recomputes all seven blocking feasibility checks without mutation. |
+| `update_plan` | Applies an atomic, version-checked update and clears invalid dependent selections. |
+| `repair_plan` | Preserves requested human choices and searches dependent alternatives for a valid version. |
+| `calculate_total_cost` | Returns scaled line items and budget evidence; incomplete references remain `null`, never fake zero. |
+| `reserve_plan` | Creates one local simulated reservation after exact-version human approval and explicit confirmation. |
 
-## Devpost copy
+Every handler performs Zod validation at runtime. Mutation tools reject stale versions. Movie/showtime and restaurant/slot changes are atomic. Unknown IDs, wrong dates, capacity failures, unsupported routes, impossible chronology, and budget failures return structured errors.
 
-**Title:** PlanOnIt — the shared evening planner for people and agents
+## Feasibility model
 
-**Tagline:** Give an agent the goal. Keep the final say.
+The solver evaluates:
 
-**Description:** PlanOnIt is a WebMCP-powered planning workspace for a night out. It coordinates dinner, a movie, transport, and a budget in one shared draft. Humans can use the UI directly, while an external agent can discover typed tools to search restaurants, find compatible showtimes, estimate rides, assemble a constraint-aware plan, inspect cost, and update a selection. The differentiator is the handoff: an agent handles cross-service comparison, a human changes the plan, and the agent adapts—without a chatbot embedded in the site or an unreviewed booking. WebMCP is central because it turns the site’s real capabilities into an agent-readable interface with descriptions, JSON schemas, validation, and structured results. The demo uses stable seeded Dhaka data and clearly labels reservations as simulated. That makes the workflow reliable while showing a practical pattern for agent-native services: structured collaboration around a human-owned stateful plan.
+1. Complete required selections.
+2. Restaurant and cinema city consistency.
+3. Exact restaurant date, slot, party limit, and remaining capacity.
+4. Movie/showtime ownership, date, and remaining seats.
+5. A known route and a transport option belonging to that route.
+6. Dinner duration + route duration + arrival buffer before movie start.
+7. Dinner + tickets + route-specific transport within the total budget.
 
-## Judge-level evaluation
+Structured cuisine, genre, transport, timing, rating, and cost priorities materially change candidate ranking. Approval is bound to a version; any edit removes approval. A reserved simulated plan is immutable.
 
-**WebMCP Leverage: 8/10.** The tools are capability-oriented, schema-described, and share state with the UI; the multi-tool workflow is the product. The remaining limitation is a seeded local data source rather than live providers.
+## Architecture
 
-**Execution: 8/10.** The core happy path, hybrid edits, approval gate, responsive UI, structured errors, tests, build, and docs are included. Browser-specific WebMCP availability remains an environment dependency.
+- `src/data.ts` — deterministic Dhaka provider fixtures.
+- `src/providers.ts` — replaceable restaurant, showtime, location, and route adapters.
+- `src/domain.ts` — evaluation, ranking, atomic updates, repair, approval, and reservation gates.
+- `src/validation.ts` — strict Zod schemas and structured validation errors.
+- `src/tools.ts` — 12 WebMCP definitions and handlers.
+- `src/persistence.ts` — validated localStorage state/history adapter.
+- `src/App.tsx` — shared human UI and top-level tool registration.
+- `scripts/build-standalone.mjs` — generates the directly openable single-file entry.
+- `tests/` — domain, adversarial input, tool, persistence, and rendered-app integration tests.
 
-**Potential Impact: 7/10.** The repeated cross-service planning problem is clear and the pattern generalizes to travel, errands, and events. Real integrations would be needed for production utility.
+## Scope and limitations
 
-**Creativity & Ambition: 8/10.** It demonstrates a believable agent-native collaboration model rather than wrapping a chatbot around a form. Top-10 risk: judges may discount the demo if the external WebMCP client is unavailable or if seeded data feels too narrow.
+- Provider inventory is seeded demo data for Dhaka on 2026-09-04 and 2026-09-05.
+- Persistence is browser-local; there is no account, backend, cross-device sync, or authentication.
+- No restaurant, cinema, map, ride, payment, or booking provider is contacted.
+- Reservation IDs are simulations and charge no money.
+- No deployment URL, public repository, submitted Devpost entry, or uploaded video is claimed here.
+- WebMCP availability depends on the current supported ChatGPT browser/model environment; consult the official documentation for current compatibility.
 
-**Overall: 7.75/10. Recommendation: Submit**, with the explicit caveat that a live deployment, public repository, and recorded video still require external hosting/account actions not available in this workspace.
+See [`docs/JUDGE_GUIDE.md`](docs/JUDGE_GUIDE.md), [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), [`docs/DEVPOST.md`](docs/DEVPOST.md), [`docs/ADVERSARIAL_AUDIT.md`](docs/ADVERSARIAL_AUDIT.md), and [`docs/FINAL_REPORT.md`](docs/FINAL_REPORT.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [`LICENSE`](LICENSE).

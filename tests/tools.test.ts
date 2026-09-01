@@ -1,31 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { initialPlan } from '../src/data';
-import { buildTools } from '../src/tools';
+import { initialPlan, defaultPreferences } from '../src/data';
+import { approvePlan } from '../src/domain';
+import { buildTools, resultErrorCode, toolNames } from '../src/tools';
 import { Plan } from '../src/types';
 
-describe('WebMCP tools', () => {
-  function harness() {
-    let plan: Plan = initialPlan;
-    const activities: string[] = [];
-    const tools = buildTools(() => plan, (next, activity) => { plan = next; activities.push(activity); });
-    return { tools, get plan() { return plan; }, activities };
-  }
-
-  it('exposes agent-friendly schemas and assembles a complete draft', async () => {
-    const h = harness();
-    expect(h.tools.map(t => t.name)).toEqual(['search_restaurants','find_showtimes','estimate_ride','create_evening_plan','get_current_plan','update_plan','calculate_total_cost','reserve_plan']);
-    const create = h.tools.find(t => t.name === 'create_evening_plan')!;
-    const result: any = await create.execute({ city: 'Dhaka', date: '2026-09-04', people: 3, budget: 5000, preferences: 'highly-rated dinner' });
-    expect(result.ok).toBe(true);
-    expect(result.plan.total).toBe(4830);
-    expect(h.activities).toHaveLength(1);
-  });
-
-  it('returns structured errors and blocks consequential actions', async () => {
-    const h = harness();
-    const update: any = h.tools.find(t => t.name === 'update_plan')!;
-    expect((await update.execute({ restaurantId: 'not-a-real-id' })).ok).toBe(false);
-    const reserve: any = h.tools.find(t => t.name === 'reserve_plan')!;
-    expect((await reserve.execute({ confirmation: 'APPROVE_DRAFT' })).error).toMatch(/approve/i);
-  });
+function harness(){let plan:Plan=initialPlan();const changes:string[]=[];const tools=buildTools(()=>plan,(next,activity)=>{plan=next;changes.push(activity)});return{tools,get plan(){return plan},set plan(value:Plan){plan=value},changes,call:(name:string,input:unknown)=>tools.find(tool=>tool.name===name)!.execute(input)};}
+describe('WebMCP handlers',()=>{
+  it('exposes only meaningful tools with strict schemas',()=>{const h=harness();expect(h.tools.map(tool=>tool.name)).toEqual(toolNames);for(const tool of h.tools){expect(tool.description.length).toBeGreaterThan(70);expect(tool.inputSchema.additionalProperties).toBe(false);}});
+  it('rejects malformed calls inside handlers',async()=>{const h=harness();expect(resultErrorCode(await h.call('create_evening_plan',{city:'Dhaka',date:'2026-09-04',people:50,budget:5000,preferences:defaultPreferences()}))).toBe('INVALID_INPUT');expect(resultErrorCode(await h.call('search_restaurants',null))).toBe('INVALID_INPUT');expect(resultErrorCode(await h.call('search_restaurants','{"city":"Dhaka"}'))).toBe('INVALID_INPUT');expect(resultErrorCode(await h.call('get_current_plan',{extra:true}))).toBe('INVALID_INPUT');});
+  it('returns route-specific estimates and rejects unknown or unsupported routes',async()=>{const h=harness();const dhaka=await h.call('estimate_transport',{fromLocationId:'dhanmondi-27',toLocationId:'bashundhara-city'});expect(dhaka).toMatchObject({ok:true,data:{distanceKm:6.2,options:expect.arrayContaining([expect.objectContaining({durationMinutes:expect.any(Number),fare:expect.any(Number)})])}});expect(resultErrorCode(await h.call('estimate_transport',{fromLocationId:'mars',toLocationId:'moon'}))).toBe('UNKNOWN_LOCATION');expect(resultErrorCode(await h.call('estimate_transport',{fromLocationId:'bashundhara-city',toLocationId:'dhanmondi-27'}))).toBe('ROUTE_NOT_FOUND');});
+  it('creates a valid version and updates shared state',async()=>{const h=harness();const result=await h.call('create_evening_plan',{city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences(),dinnerDurationMinutes:75,bufferMinutes:15});expect(result).toMatchObject({ok:true,data:{plan:{evaluation:{valid:true}}}});expect(h.plan.version).toBe(2);expect(h.changes).toHaveLength(1);});
+  it('rejects unknown showtimes and empty updates',async()=>{const h=harness();await h.call('create_evening_plan',{city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});expect(resultErrorCode(await h.call('update_plan',{expectedVersion:h.plan.version,movieId:'paper-moons',showtimeId:'missing'}))).toBe('UNKNOWN_SHOWTIME');expect(resultErrorCode(await h.call('update_plan',{expectedVersion:h.plan.version}))).toBe('INVALID_INPUT');});
+  it('blocks stale and unapproved reservations',async()=>{const h=harness();await h.call('create_evening_plan',{city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});expect(resultErrorCode(await h.call('reserve_plan',{expectedVersion:h.plan.version-1,confirmation:'CONFIRM_SIMULATED_RESERVATION'}))).toBe('STALE_PLAN_VERSION');expect(resultErrorCode(await h.call('reserve_plan',{expectedVersion:h.plan.version,confirmation:'CONFIRM_SIMULATED_RESERVATION'}))).toBe('HUMAN_APPROVAL_REQUIRED');const approved=approvePlan(h.plan,h.plan.version);if(!approved.ok)throw new Error('approval failed');h.plan=approved.data.plan;const reserved=await h.call('reserve_plan',{expectedVersion:h.plan.version,confirmation:'CONFIRM_SIMULATED_RESERVATION'});expect(reserved).toMatchObject({ok:true});expect(resultErrorCode(await h.call('reserve_plan',{expectedVersion:h.plan.version,confirmation:'CONFIRM_SIMULATED_RESERVATION'}))).toBe('RESERVATION_ALREADY_EXISTS');});
 });
