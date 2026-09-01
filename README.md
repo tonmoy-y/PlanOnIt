@@ -104,4 +104,4 @@ See [`docs/JUDGE_GUIDE.md`](docs/JUDGE_GUIDE.md), [`docs/DEMO_SCRIPT.md`](docs/D
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+See [`LICENSE`](LICENSE).
