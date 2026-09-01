@@ -22,6 +22,7 @@ export interface InventoryProvider {
   showtimesForDate(date:string):Showtime[];
   showtimeSnapshot(id?:string,plan?:Plan):Showtime|undefined;
   getReservation(plan:Pick<Plan,'id'|'version'>):Reservation|undefined;
+  listReservations():Reservation[];
   reserve(plan:Plan):ToolResult<{reservation:Reservation;idempotent:boolean}>;
   exportState():ProviderState;
   importState(state?:ProviderState):void;
@@ -57,6 +58,7 @@ export class MutableDemoProvider implements InventoryProvider {
   }
 
   getReservation(plan:Pick<Plan,'id'|'version'>){return this.state.reservations[`${plan.id}:v${plan.version}`];}
+  listReservations(){return Object.values(this.state.reservations).map(item=>clone(item)).sort((a,b)=>b.version-a.version);}
   showtimeSnapshot(id?:string,plan?:Plan){
     const showtime=this.getShowtime(id);if(!showtime)return undefined;
     const reservation=plan&&this.getReservation(plan);const commitment=reservation?.status==='confirmed'?reservation.inventory.find(item=>item.kind==='showtime'&&item.inventoryKey===showtime.id&&item.state==='committed'):undefined;const owned=Boolean(commitment);

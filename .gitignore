@@ -13,7 +13,7 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 .cache/
-
+netlify.*
 # Local environment files
 .env
 .env.*

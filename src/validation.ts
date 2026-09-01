@@ -49,6 +49,7 @@ export const updatePlanSchema=z.object({
   if(Boolean(value.restaurantId)!==Boolean(value.restaurantSlot))ctx.addIssue({code:'custom',path:['restaurantId'],message:'restaurantId and restaurantSlot must be updated together'});
 });
 export const repairPlanSchema=z.object({expectedVersion:z.number().int().positive(),preserveRestaurant:z.boolean().default(true),preserveMovie:z.boolean().default(false)}).strict();
+export const startNewPlanSchema=z.object({expectedVersion:z.number().int().positive(),acknowledgeExistingReservation:z.boolean().default(true)}).strict();
 export const reservePlanSchema=z.object({expectedVersion:z.number().int().positive(),confirmation:z.literal('CONFIRM_SIMULATED_RESERVATION')}).strict();
 
 export function validationError(error:z.ZodError):ToolResult<never>{

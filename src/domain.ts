@@ -112,6 +112,15 @@ export function repairPlan(plan:Plan,input:{expectedVersion:number;preserveResta
   return result.ok?{...result,plan:{...result.plan,changeSummary:'Repaired the plan and recalculated dependent choices'}}:result;
 }
 
+export const hasActiveReservation=(plan:Plan)=>plan.status==='reserved'&&plan.reservation?.status==='confirmed';
+export function startNewPlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider):ToolResult<{plan:Plan;archivedReservation?:Reservation;reservationLedger:Reservation[]}>{
+  if(expectedVersion!==plan.version)return fail('STALE_PLAN_VERSION',`Expected version ${expectedVersion}, but current version is ${plan.version}.`,'expectedVersion',true);
+  if(plan.status==='reservation_pending')return fail('RESERVATION_IN_PROGRESS','A reservation attempt is still resolving. Retry once it settles.',undefined,true);
+  const archivedReservation=hasActiveReservation(plan)?plan.reservation:undefined;
+  const next:Plan={...createBlankPlan({city:plan.city,date:plan.date,people:plan.people,budget:plan.budget}),preferences:plan.preferences,version:plan.version+1,status:'draft',updatedAt:newTimestamp(),changeSummary:archivedReservation?`Started a new plan; reservation ${archivedReservation.id} stays committed to version ${archivedReservation.version}`:'Started a new plan'};
+  return ok({plan:next,archivedReservation,reservationLedger:provider.listReservations()});
+}
+
 export function approvePlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider):ToolResult<{plan:Plan;evaluation:PlanEvaluation}>{
   if(expectedVersion!==plan.version)return fail('STALE_PLAN_VERSION',`Expected version ${expectedVersion}, but current version is ${plan.version}.`,'expectedVersion',true);
   if(plan.status==='reserved')return fail('PLAN_ALREADY_RESERVED','This plan already has a simulated reservation.');
@@ -120,7 +129,7 @@ export function approvePlan(plan:Plan,expectedVersion:number,provider:InventoryP
 }
 
 export type ReservationResult={ok:true;data:{plan:Plan;reservationId:string;message:string;idempotent:boolean;transitions:string[]}}|{ok:false;error:ToolError;plan?:Plan;transitions?:string[]};
-export function reservePlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider):ReservationResult{
+export async function reservePlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider,onPending?:(plan:Plan)=>void|Promise<void>):Promise<ReservationResult>{
   if(expectedVersion!==plan.version)return fail('STALE_PLAN_VERSION',`Expected version ${expectedVersion}, but current version is ${plan.version}.`,'expectedVersion',true);
   if(plan.status==='reserved'&&plan.reservation?.status==='confirmed')return {ok:true,data:{plan,reservationId:plan.reservation.id,message:'The existing sandbox confirmation was returned without consuming inventory again.',idempotent:true,transitions:['reserved']}};
   if(plan.status!=='approved'||plan.approval?.version!==plan.version)return fail('HUMAN_APPROVAL_REQUIRED','The human must approve this exact valid version in the UI first.',undefined,true);
@@ -129,6 +138,7 @@ export function reservePlan(plan:Plan,expectedVersion:number,provider:InventoryP
   const idempotencyKey=`${plan.id}:v${plan.version}`;const selectedRestaurant=provider.getRestaurant(plan.selections.restaurantId);const selectedSlot=selectedRestaurant&&provider.restaurantSlots(selectedRestaurant,plan.date).find(item=>item.time===plan.selections.restaurantSlot);const selectedShowtime=provider.getShowtime(plan.selections.showtimeId);
   const pendingReservation:Reservation={id:`PENDING-${plan.id.toUpperCase()}-V${plan.version}`,planId:plan.id,version:plan.version,providerRevision:provider.revision,status:'pending',reservedAt:newTimestamp(),idempotencyKey,inventory:[...(selectedRestaurant&&selectedSlot?[{kind:'restaurant' as const,inventoryKey:`${selectedRestaurant.id}|${plan.date}|${selectedSlot.time}`,quantity:plan.people,state:'held' as const}]:[]),...(selectedShowtime?[{kind:'showtime' as const,inventoryKey:selectedShowtime.id,quantity:plan.people,state:'held' as const}]:[])]};
   const pendingPlan:Plan={...plan,status:'reservation_pending',reservation:pendingReservation,updatedAt:newTimestamp(),changeSummary:'Sandbox reservation pending'};
+  if(onPending)await onPending(pendingPlan);
   const providerResult=provider.reserve(pendingPlan);if(!providerResult.ok){const failedReservation:Reservation={...pendingReservation,status:'failed',inventory:pendingReservation.inventory.map(item=>({...item,state:'released'})),failureCode:providerResult.error.code};const failedPlan:Plan={...plan,status:'reservation_failed',approval:undefined,reservation:failedReservation,updatedAt:newTimestamp(),changeSummary:`Sandbox reservation failed: ${providerResult.error.code}`};return {ok:false,error:providerResult.error,plan:failedPlan,transitions:['approved','reservation_pending','reservation_failed']};}
   const reservation=providerResult.data.reservation;const next:Plan={...plan,status:'reserved',reservation,updatedAt:newTimestamp(),changeSummary:`Created sandbox reservation ${reservation.id}`};
   return {ok:true,data:{plan:next,reservationId:reservation.id,idempotent:providerResult.data.idempotent,transitions:['approved','reservation_pending','reserved'],message:'Sandbox provider confirmation created. Inventory was committed to this plan; no real business, payment, or ride service was contacted.'}};
