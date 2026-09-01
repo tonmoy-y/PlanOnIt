@@ -40,6 +40,8 @@ npm install
 npm run dev
 ```
 
+For a normal development session, use the URL printed by Vite. The root `index.html` is also a standalone, double-clickable production entry: run `npm run build` once, then open `/Users/tonmoy/Documents/PlanOnIt/index.html` directly. Its bundled assets use relative paths and do not require a server.
+
 Build and test:
 
 ```bash
