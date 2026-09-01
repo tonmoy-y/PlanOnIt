@@ -1,26 +1,24 @@
-# Adversarial recovery audit
+# Final adversarial audit
 
-This file records verifiable implementation evidence. It is not a self-awarded hackathon score.
-
-| Prior failure mode | Recovery evidence |
+| Attack or prior failure | Final behavior and evidence |
 |---|---|
-| Root `index.html` failed when opened directly | `npm run build` now inlines production CSS and JavaScript into the root entry via `scripts/build-standalone.mjs`; no external `file://` module fetch remains. |
-| A local modal was presented as WebMCP | The local action is named **Quick Planner** and its activity source says `Local solver — not an external agent or WebMCP call`. The badge reflects actual registration state. |
-| Tool handlers trusted JSON Schema alone | Every handler calls a strict Zod parser and returns a structured `INVALID_INPUT` error with field details. |
-| Movie title and showtime could disagree | Movie/showtime updates are atomic and validate ownership, date, and seats. Invalid references are not priced as zero. |
-| Transport was relabeled across unrelated venues | Routes are keyed by origin/destination; options belong to one route; venue changes clear incompatible transport. Unknown routes fail. |
-| Timeline was cosmetic | Dinner end, departure, arrival, buffer, movie start, movie end, and slack are calculated from provider entities. Impossible chronology blocks validity. |
-| Budget ignored party scaling or invalid references | Dinner and tickets scale by people; transport uses a route fare; incomplete components and total are `null`; approval is blocked. |
-| Preferences did not matter | Cuisine, genre, transport, timing, minimum rating, and priority influence filtering or candidate scoring; ranking behavior has tests. |
-| Approval was a loose boolean | Approval records an exact version; any edit removes it; invalid/stale approval is rejected. Reservation requires that exact approved version and is one-shot. |
-| Human and agent edits could overwrite each other | Every mutation requires `expectedVersion`; stale changes return `STALE_PLAN_VERSION`. |
-| Refresh lost the demo | Validated plan state and up to 20 activity entries persist in localStorage; malformed storage falls back safely. |
-| Desktop-only navigation | The UI has a mobile drawer, bottom navigation, responsive grids, labeled controls, visible keyboard focus, and live status announcements. |
-| Tests covered only the happy path | The suite covers solver constraints, provider integrity, malformed calls, stale versions, dependency clearing, approval/reservation gates, persistence, and rendered WebMCP-to-UI integration. |
+| Open committed `index.html` directly | Production CSS/JS are inlined; the regression forbids external script and stylesheet assets. |
+| `2026-02-30` date rollover | Exact UTC component comparison rejects impossible dates; leap and month-end boundaries are tested. |
+| Enter `-10` in the human budget field | Text stays staged in the field, an inline error appears, and canonical plan/version/storage remain unchanged. |
+| Bypass the UI and call the domain directly | `applyPlanUpdate` itself parses `updatePlanSchema`; callers cannot skip runtime validation. |
+| Mismatch movie and showtime | Atomic pair validation rejects it and movie cost remains null rather than zero. |
+| Reuse transport after venue change | Options belong to one origin/destination route; incompatible transport is cleared. |
+| Approve stale/invalid plan | Exact version, eight checks, and provider revision gate approval/reservation. |
+| Inventory disappears after approval | `PROVIDER_STATE_CHANGED` forces revalidation and renewed human approval. |
+| Provider conflict or failure | No inventory or reservation state is committed. |
+| Retry a successful reservation | The idempotency key returns the same confirmation with no second decrement. |
+| Human and agent race | Optimistic versions reject stale writes; Web Locks serialize compare-and-swap; cross-tab updates converge without timestamp-based last-write-wins. |
+| Netlify badge intercepts mobile Plan button | Fixed bottom navigation was removed. Header step navigation remains in document flow at 375/390/412 px. |
+| Local automation presented as AI | **Create plan preview** and local repair are labeled fallbacks; only registered tool execution is agent activity. |
+| Tool client skips JSON Schema | Every handler parses a strict Zod schema; every tool has malformed and success-path tests. |
+| Provider state is malformed in storage | The entire provider envelope has a strict schema and invalid provider state is discarded. |
 
-## Verified recovery commands
-
-Run these from the repository root:
+## Verification
 
 ```bash
 npm run lint
@@ -30,4 +28,4 @@ npm run build
 npm audit --omit=dev
 ```
 
-Live browser verification should additionally cover site-tool discovery, a real `create_evening_plan` call, the human-edit/agent-repair loop, stale-version rejection, approval persistence, and the 375 px responsive navigation.
+Current result: 81 tests pass, lint/typecheck/build pass, the built-in browser discovers and invokes 12 live imperative tools, and responsive/golden-path checks pass locally. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are not claimed as verified.

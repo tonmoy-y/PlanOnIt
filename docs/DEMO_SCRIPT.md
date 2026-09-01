@@ -1,39 +1,25 @@
 # Three-minute demo script
 
-## 0:00–0:20 — The problem
+## 0:00–0:35 — One clear promise
 
-“A simple night out hides a constraint problem: table availability, movie times, travel between actual venues, and one total budget. PlanOnIt gives a person and an external agent the same stateful workspace.”
+Show the Goal screen: “Tell an agent what you want. Keep the final say.” Point to the shared version strip and the `Agent-ready · 12 tools` state. Copy the canonical request.
 
-Show the empty overview, the seven feasibility checks, and the `WebMCP active · 12 tools` badge.
+## 0:35–1:15 — Agent creates evidence
 
-## 0:20–1:05 — External-agent creation
+Let the external agent call `create_evening_plan`, then `validate_plan`. Open **Plan** and show the exact dinner slot/capacity, atomic movie/showtime/cinema, route-specific transport, computed chronology, eight checks, scaled total, plan version, and provider revision.
 
-Use the canonical prompt from the overview. Let the agent call `create_evening_plan`, then `get_current_plan` or `validate_plan`.
+## 1:15–2:10 — Human breaks, agent repairs
 
-Open **Plan & evidence**. Point out:
+In **Explore**, make a dinner choice that clears or invalidates a dependency. Return to Plan and show the prominent failed-check callout. Ask the agent to repair the current version while preserving dinner. Highlight that it either returns a fully evidenced plan or an honest structured failure; it never invents availability.
 
-- the exact restaurant slot and remaining capacity;
-- the movie/showtime/cinema relationship and seats;
-- the venue-specific route, fare, and duration;
-- dinner end, travel, arrival buffer, movie start, movie end, and slack;
-- the scaled total and remaining budget.
+Send one mutation with the old version and show `STALE_PLAN_VERSION`.
 
-## 1:05–2:05 — Human edit and honest failure
+## 2:10–2:40 — Human control and changing state
 
-Open **Build manually** and select The Smoke House at 6:30 PM. Show that the plan is a new invalid version and the old route choice disappeared.
+Approve the repaired version in the UI. Explain that WebMCP has no approval tool. Change the budget and show that approval disappears. Reapprove and optionally confirm the sandbox reservation: table and seat inventory decrement once, while an identical retry is idempotent.
 
-Ask the agent to preserve dinner and repair. At ৳5,000, show the structured `NO_FEASIBLE_PLAN` result. Say: “Failure is part of the product—the agent explains an impossible constraint instead of inventing a route or silently breaking budget.”
+## 2:40–3:00 — Close
 
-Increase the budget to ৳7,000. Ask the agent to repair the new version. Show the preserved dinner, recomputed movie/route, valid timeline, and agent/human activity entries.
+“PlanOnIt is a human-controlled workspace where an external agent coordinates multiple services, detects conflicts, repairs plans under constraints, and safely acts on changing information through WebMCP.”
 
-## 2:05–2:35 — Concurrency and control
-
-Call one mutation with the prior version and show `STALE_PLAN_VERSION`. In the UI, approve the valid current version. Explain that approval is version-bound and any edit invalidates it.
-
-Optionally show the simulated reservation confirmation, making clear that no provider or payment system is contacted.
-
-## 2:35–3:00 — Close
-
-“WebMCP is not a chatbot bolted onto this site. It exposes the site’s real planning capabilities to an external agent, while the human keeps an editable interface, evidence, history, and the final say.”
-
-Finish on the feasibility report and reliable cost card. Do not claim a live deployment, real booking, or uploaded video unless those actions have actually happened.
+Do not claim real bookings, payment, hosted provider state, a deployment URL, video, or Devpost status unless each is verified live.

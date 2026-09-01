@@ -1,40 +1,29 @@
 # Judge guide
 
-## Fast path
+## Five-minute path
 
-1. Run `npm install` and `npm run dev`.
-2. Open the Vite URL in the supported ChatGPT desktop built-in browser.
-3. Confirm the header says `WebMCP active · 12 tools`.
-4. Ask: “Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use create_evening_plan, show feasibility evidence, and never approve for me.”
-5. Open **Plan & evidence**. Confirm all seven checks pass, every timeline time is computed, and the total includes three dinners, three tickets, and one route-specific fare.
+1. Run `npm install && npm run dev` and open the URL in the supported ChatGPT built-in browser.
+2. Confirm `Agent-ready · 12 tools` and copy the on-page agent request.
+3. Have the external agent create a plan. Open **3. Plan** and inspect the exact table slot, movie/showtime, route, chronology, scaled cost, eight checks, plan version, and provider revision.
+4. Open **2. Explore**, change the dinner choice, and return to Plan. If the route or chronology breaks, the repair callout must name each failed check.
+5. Ask the agent: “Repair PlanOnIt plan vN. Preserve the restaurant if possible, explain every changed dependency, and validate the result.”
+6. Try a mutation with the previous version; expect `STALE_PLAN_VERSION`.
+7. Approve the valid current version in the UI. Edit the budget and confirm the approval disappears on the new version.
 
-## Signature human-agent repair
+## Provider-state path
 
-Start from the generated plan.
-
-1. In **Build manually**, select **The Smoke House** at **6:30 PM**. The new version becomes invalid because its old transport selection is cleared instead of being relabeled for another route.
-2. Ask the agent to call `get_current_plan`, then `repair_plan` with the displayed `expectedVersion`, `preserveRestaurant: true`, and `preserveMovie: false`.
-3. Under the original ৳5,000 constraint, the tool should return `NO_FEASIBLE_PLAN` and explain the failed budget/chronology tradeoff instead of fabricating a result.
-4. Change the budget to ৳7,000 in **Overview**. This creates another human-authored version.
-5. Ask the agent to retry `repair_plan` with the new version. The repaired plan preserves The Smoke House, chooses compatible downstream services, and returns full evidence.
-6. Try `update_plan` with the previous version number. It must return `STALE_PLAN_VERSION`.
-7. Approve the valid current version in the UI. Reload the page and confirm the plan, approval, and activity history remain.
-
-`reserve_plan` is optional for judging. It is local and simulated, but still requires the human-approved exact version plus `CONFIRM_SIMULATED_RESERVATION`; repeated calls are rejected.
+Reservation is a controlled sandbox side effect. After human approval, `reserve_plan` with `CONFIRM_SIMULATED_RESERVATION` decrements the selected table capacity and showtime seats together. A retry returns the same confirmation without another decrement. If provider inventory changes after approval, expect `PROVIDER_STATE_CHANGED`; conflict/failure consumes nothing. No real provider or payment is contacted.
 
 ## Adversarial checks
 
-- Call any tool with an extra property: strict schemas reject it.
-- Search for 50 people: `INVALID_INPUT`.
-- Use an unknown restaurant, movie, showtime, or location ID: structured unknown-ID error.
-- Pair `paper-moons` with a `the-last-signal` showtime: `MOVIE_SHOWTIME_MISMATCH`.
-- Use a showtime from the wrong plan date: `SHOWTIME_DATE_MISMATCH`.
-- Use a transport option from another route: `INVALID_TRANSPORT_OPTION`.
-- Approve an empty, invalid, over-budget, or stale plan: blocked.
-- Reserve before approval or reserve twice: blocked.
+- `2026-02-30`, non-integer people, negative budget, values above limits, extra keys, strings where numbers are required: `INVALID_INPUT`.
+- Unknown entities and unsupported routes: structured errors.
+- Mismatched movie/showtime, wrong date, or route option: rejected atomically.
+- Incomplete, over-budget, stale, or provider-stale plans: approval/reservation blocked.
+- Open two same-origin tabs. A newer plan/provider revision synchronizes; a concurrent same-version state is resolved visibly in Activity.
 
-## Local fallback and standalone entry
+## Manual and mobile checks
 
-**Quick Planner** is intentionally labeled as a local deterministic fallback. It is not WebMCP and does not add an “agent” activity entry.
+The local solver is labeled **Create plan preview** and never masquerades as an agent. The root `index.html` is an inlined standalone entry. At 375, 390, and 412 px the header navigation is in normal document flow—there is no fixed bottom bar for a deployment badge to cover.
 
-`npm run build` produces both hosted files in `dist/` and a root `index.html` with inlined production assets. The root file is intended for direct opening when a server is inconvenient.
+Run `npm run lint && npm run typecheck && npm test && npm run build` before judging.

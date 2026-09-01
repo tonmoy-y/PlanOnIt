@@ -1,26 +1,19 @@
 # PlanOnIt
 
-PlanOnIt is a shared evening-planning workspace for a person and an external WebMCP agent. It coordinates a restaurant slot, an exact movie showtime, venue-to-venue transport, chronology, and a total budget in one versioned plan.
+PlanOnIt is a human-controlled planning workspace where an external AI agent can coordinate dinner, a movie, and transport through WebMCP, repair conflicts, and leave final approval to the person using the page.
 
-The key interaction is repair, not just generation: an agent can create a feasible plan, a person can change one choice in the UI, and `repair_plan` can preserve that choice while recomputing dependent selections. The person alone approves the current valid version. Reservation is a clearly labeled local simulation.
+[Public repository](https://github.com/tonmoy-y/PlanOnIt)
 
-## Run it
+The evaluator reported a Netlify deployment, but its URL is not stored in this checkout and could not be independently resolved. `netlify.toml` now contains the verified build and publish settings; confirm the existing site URL after pushing this revision.
+
+## Run and verify
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. For a production build:
-
-```bash
-npm run build
-npm run preview
-```
-
-`npm run build` also regenerates the root [`index.html`](index.html) as a single file with inlined CSS and JavaScript. The committed file can be opened directly without a server; it does not fetch `file://` module assets.
-
-Quality checks:
+Open the Vite URL. Production and quality checks:
 
 ```bash
 npm run lint
@@ -28,80 +21,70 @@ npm run typecheck
 npm test
 npm run build
 npm audit --omit=dev
+npm run preview
 ```
 
-## WebMCP workflow
+`npm run build` creates the normal Netlify-ready `dist/` output and regenerates the committed root `index.html` as a single file with inlined CSS and JavaScript. The root file can therefore be opened directly without the previous `file://` asset failure.
 
-PlanOnIt uses the imperative `document.modelContext.registerTool` API described in the [official WebMCP documentation](https://learn.chatgpt.com/docs/webmcp). The supported ChatGPT desktop browser discovers the tools from the live page, and tool mutations update the same persisted React state as human edits.
+## Judge fast path
 
-Canonical prompt:
+1. Open the app in the supported ChatGPT built-in browser.
+2. Confirm the header shows `Agent-ready · 12 tools`.
+3. Copy the on-page request: “Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use PlanOnIt's site tools, show me feasibility evidence, and leave approval to me.”
+4. Review the resulting timeline, eight checks, provider revision, and scaled total.
+5. Make a manual choice that breaks the plan, then ask the agent to use `repair_plan` while preserving that choice.
+6. Approve the repaired version in the UI. Approval is never available as a WebMCP tool.
 
-> Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use create_evening_plan, show feasibility evidence, and never approve for me.
+The **Create plan preview** button is an honest local fallback. It uses the same domain solver but is not presented as an external agent call.
 
-The page reports registration honestly:
+## WebMCP design
 
-- `WebMCP active · 12 tools` only after every registration promise resolves.
-- `WebMCP unavailable in this browser` when the API is absent.
-- `WebMCP registration failed` when registration rejects.
+PlanOnIt follows the [official WebMCP guidance](https://learn.chatgpt.com/docs/webmcp): imperative top-level registration, narrow schemas, explicit side effects, runtime validation, useful verification context, and a fully usable human interface.
 
-The local **Quick Planner** runs the same deterministic solver for manual testing, but is never presented as an agent or WebMCP execution.
-
-## Site tools
-
-| Tool | Behavior |
+| Job | Tools |
 |---|---|
-| `search_restaurants` | Filters by date, party size, cuisine, rating, price, and remaining table capacity. |
-| `get_restaurant_details` | Returns one restaurant’s location, hours, limits, price, and availability inventory. |
-| `check_restaurant_availability` | Checks exact date/party capacity and returns valid slots. |
-| `find_showtimes` | Returns atomic movie/showtime pairs with date, cinema, seats, duration, and ticket price. |
-| `estimate_transport` | Returns only known venue-to-venue routes with route-specific fares and durations. |
-| `create_evening_plan` | Searches and ranks restaurant slot × showtime × route option combinations. |
-| `get_current_plan` | Reads the shared version, entities, selections, evidence, approval, and reservation state. |
-| `validate_plan` | Recomputes all seven blocking feasibility checks without mutation. |
-| `update_plan` | Applies an atomic, version-checked update and clears invalid dependent selections. |
-| `repair_plan` | Preserves requested human choices and searches dependent alternatives for a valid version. |
-| `calculate_total_cost` | Returns scaled line items and budget evidence; incomplete references remain `null`, never fake zero. |
-| `reserve_plan` | Creates one local simulated reservation after exact-version human approval and explicit confirmation. |
+| Discover | `search_restaurants`, `get_restaurant_details`, `check_restaurant_availability`, `find_showtimes`, `estimate_transport` |
+| Plan and verify | `create_evening_plan`, `get_current_plan`, `validate_plan`, `calculate_total_cost` |
+| Collaborate | `update_plan`, `repair_plan` |
+| Confirm | `reserve_plan` |
 
-Every handler performs Zod validation at runtime. Mutation tools reject stale versions. Movie/showtime and restaurant/slot changes are atomic. Unknown IDs, wrong dates, capacity failures, unsupported routes, impossible chronology, and budget failures return structured errors.
+All 12 handlers parse untrusted input with strict Zod schemas. Mutations require `expectedVersion`; restaurant/slot and movie/showtime pairs are atomic; invalid references and incomplete prices never become fake zero-cost successes.
 
-## Feasibility model
+## Feasibility and safety
 
-The solver evaluates:
+Every plan exposes eight blocking checks:
 
-1. Complete required selections.
-2. Restaurant and cinema city consistency.
-3. Exact restaurant date, slot, party limit, and remaining capacity.
-4. Movie/showtime ownership, date, and remaining seats.
-5. A known route and a transport option belonging to that route.
-6. Dinner duration + route duration + arrival buffer before movie start.
-7. Dinner + tickets + route-specific transport within the total budget.
+1. required selections;
+2. city consistency;
+3. exact table/date/party availability;
+4. movie/showtime/date/seat integrity;
+5. reservation ownership for the exact plan version;
+6. a route-specific transport option;
+7. dinner, travel, buffer, movie chronology, and maximum idle-time policy;
+8. the party-scaled total budget.
 
-Structured cuisine, genre, transport, timing, rating, and cost priorities materially change candidate ranking. Approval is bound to a version; any edit removes approval. A reserved simulated plan is immutable.
+Approval records the exact plan version and mutable provider revision. Any meaningful human or agent edit clears approval; unchanged input is a no-op. If inventory changes after approval, reservation returns `PROVIDER_STATE_CHANGED`. The sandbox provider models pending, confirmed, and failed outcomes, commits table and seat inventory atomically, keeps committed capacity valid for its owning plan, consumes nothing on conflict/failure, and returns the same confirmation on an idempotent retry. It does not contact a real business or payment service.
 
 ## Architecture
 
-- `src/data.ts` — deterministic Dhaka provider fixtures.
-- `src/providers.ts` — replaceable restaurant, showtime, location, and route adapters.
-- `src/domain.ts` — evaluation, ranking, atomic updates, repair, approval, and reservation gates.
-- `src/validation.ts` — strict Zod schemas and structured validation errors.
-- `src/tools.ts` — 12 WebMCP definitions and handlers.
-- `src/persistence.ts` — validated localStorage state/history adapter.
-- `src/App.tsx` — shared human UI and top-level tool registration.
-- `scripts/build-standalone.mjs` — generates the directly openable single-file entry.
-- `tests/` — domain, adversarial input, tool, persistence, and rendered-app integration tests.
+- `src/providers.ts` — `InventoryProvider` interface and mutable date-window sandbox, including ownership, conflict, failure, and idempotency behavior.
+- `src/domain.ts` — solver, evaluation, versioned mutations, repair, approval, and transactional reservation gates.
+- `src/validation.ts` — strict shared schemas, including non-normalizing calendar-date validation.
+- `src/tools.ts` — 12 imperative WebMCP definitions and handlers.
+- `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
+- `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
+- `tests/` — 81 unit and integration tests covering each tool, UI validation, reservation transitions, provider mutations, concurrency, and the standalone entry.
 
-## Scope and limitations
+## Honest scope
 
-- Provider inventory is seeded demo data for Dhaka on 2026-09-04 and 2026-09-05.
-- Persistence is browser-local; there is no account, backend, cross-device sync, or authentication.
-- No restaurant, cinema, map, ride, payment, or booking provider is contacted.
-- Reservation IDs are simulations and charge no money.
-- No deployment URL, public repository, submitted Devpost entry, or uploaded video is claimed here.
-- WebMCP availability depends on the current supported ChatGPT browser/model environment; consult the official documentation for current compatibility.
+- Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
+- The mutable provider and shared workspace persist per browser origin. Same-origin tabs use a Web Locks-backed compare-and-swap boundary; stale writes fail with `CONCURRENT_WRITE_CONFLICT` or `STALE_PLAN_VERSION` and tabs converge through storage events. There is no account or cross-device server state.
+- A real deployment would move provider state, authentication, authorization, audit records, and idempotency keys to a trusted server while retaining the same interfaces.
+- WebMCP availability depends on the currently supported ChatGPT built-in browser and model environment.
+- No Devpost submission or uploaded demo video is claimed.
 
-See [`docs/JUDGE_GUIDE.md`](docs/JUDGE_GUIDE.md), [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), [`docs/DEVPOST.md`](docs/DEVPOST.md), [`docs/ADVERSARIAL_AUDIT.md`](docs/ADVERSARIAL_AUDIT.md), and [`docs/FINAL_REPORT.md`](docs/FINAL_REPORT.md).
+See [the judge guide](docs/JUDGE_GUIDE.md), [demo script](docs/DEMO_SCRIPT.md), [adversarial audit](docs/ADVERSARIAL_AUDIT.md), and [final report](docs/FINAL_REPORT.md).
 
 ## License
 
-See [`LICENSE`](LICENSE).
+See [LICENSE](LICENSE).
