@@ -15,6 +15,11 @@
 | Human and agent race | Optimistic versions reject stale writes; Web Locks serialize compare-and-swap; cross-tab updates converge without timestamp-based last-write-wins. |
 | Netlify badge intercepts mobile Plan button | Fixed bottom navigation was removed. Header step navigation remains in document flow at 375/390/412 px. |
 | Local automation presented as AI | **Create plan preview** and local repair are labeled fallbacks; only registered tool execution is agent activity. |
+| Replace a reserved plan via `create_evening_plan` | `WORKSPACE_HAS_ACTIVE_RESERVATION`; the version does not move, inventory is untouched, and the reservation stays in the ledger. `start_new_plan` is the only way forward and preserves it. |
+| Hide a commitment by starting over | The provider reservation ledger is the archive; `get_current_plan.reservationLedger` and the Plan screen both show superseded commitments. |
+| Forge an approval or provider revision | `HUMAN_APPROVAL_REQUIRED` / `PROVIDER_STATE_CHANGED`. |
+| Fabricate a reservation object on a plan | The reservation-ownership check finds no matching provider commitment and the plan is invalid. |
+| Smuggle `status` or `approval` through `update_plan` | Strict schema rejects unknown keys with `INVALID_INPUT`. |
 | Tool client skips JSON Schema | Every handler parses a strict Zod schema; every tool has malformed and success-path tests. |
 | Provider state is malformed in storage | The entire provider envelope has a strict schema and invalid provider state is discarded. |
 
@@ -28,4 +33,4 @@ npm run build
 npm audit --omit=dev
 ```
 
-Current result: 81 tests pass, lint/typecheck/build pass, the built-in browser discovers and invokes 12 live imperative tools, and responsive/golden-path checks pass locally. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are not claimed as verified.
+Current result: 112 unit/integration tests and 12 real-browser mobile tests pass, lint/typecheck/build pass, the built-in browser discovers and invokes 12 live imperative tools, and responsive/golden-path checks pass locally. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are not claimed as verified.

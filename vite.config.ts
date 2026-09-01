@@ -14,5 +14,9 @@ export default defineConfig({
         assetFileNames: 'assets/[name][extname]'
       }
     }
+  },
+  test: {
+    // Vitest owns the unit/integration suite; tests/browser belongs to Playwright.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/browser/**'],
   }
 });

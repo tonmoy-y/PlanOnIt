@@ -1,3 +1,4 @@
+import { LocalReservationAuthority, ReservationAuthority } from './authority';
 import { defaultPreferences, initialPlan } from './data';
 import { demoProvider, InventoryProvider } from './providers';
 import { FeasibilityCheck, Plan, PlanEvaluation, PlannerResult, PlanSnapshot, Preferences, Reservation, ToolError, ToolResult } from './types';
@@ -129,7 +130,7 @@ export function approvePlan(plan:Plan,expectedVersion:number,provider:InventoryP
 }
 
 export type ReservationResult={ok:true;data:{plan:Plan;reservationId:string;message:string;idempotent:boolean;transitions:string[]}}|{ok:false;error:ToolError;plan?:Plan;transitions?:string[]};
-export async function reservePlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider,onPending?:(plan:Plan)=>void|Promise<void>):Promise<ReservationResult>{
+export async function reservePlan(plan:Plan,expectedVersion:number,provider:InventoryProvider=demoProvider,onPending?:(plan:Plan)=>void|Promise<void>,authority:ReservationAuthority=new LocalReservationAuthority(provider)):Promise<ReservationResult>{
   if(expectedVersion!==plan.version)return fail('STALE_PLAN_VERSION',`Expected version ${expectedVersion}, but current version is ${plan.version}.`,'expectedVersion',true);
   if(plan.status==='reserved'&&plan.reservation?.status==='confirmed')return {ok:true,data:{plan,reservationId:plan.reservation.id,message:'The existing sandbox confirmation was returned without consuming inventory again.',idempotent:true,transitions:['reserved']}};
   if(plan.status!=='approved'||plan.approval?.version!==plan.version)return fail('HUMAN_APPROVAL_REQUIRED','The human must approve this exact valid version in the UI first.',undefined,true);
@@ -139,7 +140,8 @@ export async function reservePlan(plan:Plan,expectedVersion:number,provider:Inve
   const pendingReservation:Reservation={id:`PENDING-${plan.id.toUpperCase()}-V${plan.version}`,planId:plan.id,version:plan.version,providerRevision:provider.revision,status:'pending',reservedAt:newTimestamp(),idempotencyKey,inventory:[...(selectedRestaurant&&selectedSlot?[{kind:'restaurant' as const,inventoryKey:`${selectedRestaurant.id}|${plan.date}|${selectedSlot.time}`,quantity:plan.people,state:'held' as const}]:[]),...(selectedShowtime?[{kind:'showtime' as const,inventoryKey:selectedShowtime.id,quantity:plan.people,state:'held' as const}]:[])]};
   const pendingPlan:Plan={...plan,status:'reservation_pending',reservation:pendingReservation,updatedAt:newTimestamp(),changeSummary:'Sandbox reservation pending'};
   if(onPending)await onPending(pendingPlan);
-  const providerResult=provider.reserve(pendingPlan);if(!providerResult.ok){const failedReservation:Reservation={...pendingReservation,status:'failed',inventory:pendingReservation.inventory.map(item=>({...item,state:'released'})),failureCode:providerResult.error.code};const failedPlan:Plan={...plan,status:'reservation_failed',approval:undefined,reservation:failedReservation,updatedAt:newTimestamp(),changeSummary:`Sandbox reservation failed: ${providerResult.error.code}`};return {ok:false,error:providerResult.error,plan:failedPlan,transitions:['approved','reservation_pending','reservation_failed']};}
+  const providerResult=await authority.commit(pendingPlan);
+  if(providerResult.ok&&providerResult.data.providerState)provider.importState(providerResult.data.providerState);if(!providerResult.ok){const failedReservation:Reservation={...pendingReservation,status:'failed',inventory:pendingReservation.inventory.map(item=>({...item,state:'released'})),failureCode:providerResult.error.code};const failedPlan:Plan={...plan,status:'reservation_failed',approval:undefined,reservation:failedReservation,updatedAt:newTimestamp(),changeSummary:`Sandbox reservation failed: ${providerResult.error.code}`};return {ok:false,error:providerResult.error,plan:failedPlan,transitions:['approved','reservation_pending','reservation_failed']};}
   const reservation=providerResult.data.reservation;const next:Plan={...plan,status:'reserved',reservation,updatedAt:newTimestamp(),changeSummary:`Created sandbox reservation ${reservation.id}`};
   return {ok:true,data:{plan:next,reservationId:reservation.id,idempotent:providerResult.data.idempotent,transitions:['approved','reservation_pending','reserved'],message:'Sandbox provider confirmation created. Inventory was committed to this plan; no real business, payment, or ride service was contacted.'}};
 }

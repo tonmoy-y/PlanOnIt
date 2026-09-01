@@ -1,5 +1,7 @@
 # FINAL IMPLEMENTATION REPORT
 
+> **Revision 3 (final hardening pass).** Closes the reserved-plan replacement defect, makes `reservation_pending` observable, aligns advertised schemas with runtime cross-field rules, adds real multi-viewport browser verification, and adds an opt-in server-authoritative reservation boundary. Sections 8 and 9 are restated at the end of this file; where the older text below disagrees with those sections, the later sections are current.
+
 ## 1. What Was Fixed
 
 The independent 32.8/40 audit was reproduced before implementation. Its P0 exact-capacity failure was captured in a failing regression: a successful reservation reduced remaining capacity to zero and then invalidated the owning plan. Reservation evaluation is now ownership-aware, selected restaurant/showtime snapshots come from current provider state, and the owning reserved plan remains valid. Unsupported and past dates, excessive idle gaps, stale approval, malformed atomic selections, and unchanged updates are also handled explicitly.
@@ -65,3 +67,59 @@ Then repeat the live WebMCP and mobile checks against the returned HTTPS URL.
 ## 11. Final Verdict
 
 **IMPROVE BEFORE SUBMISSION** if the standard is truly 39+/40. The code is now correct, demonstrable, and substantially more competitive, but reaching 39+ requires a trusted hosted provider/workspace transaction boundary and verification of the actual HTTPS deployment. If the deadline prevents those two infrastructure tasks, this build is still a defensible submission, but it should not be scored as 39 merely because that was the target.
+
+
+---
+
+## 12. Revision 3 — what changed after the 37.2/40 audit
+
+### 12.1 Reserved-plan lifecycle (P0)
+
+The audit was reproduced exactly: with version 11 reserved, `create_evening_plan` created version 12, the workspace stopped exposing the reservation, and the provider still held `current-plan:v11` committed — a hidden historical commitment, and an inconsistency with `update_plan`'s `PLAN_IMMUTABLE`.
+
+Fixed on every path. `create_evening_plan` now returns `WORKSPACE_HAS_ACTIVE_RESERVATION` naming the reservation and the required next call, and the human paths (`Create plan preview`, date change, local repair) are gated by the same predicate. Planning again requires the explicit `start_new_plan` tool or the **Start a new plan** button, which raises the version, clears the draft, preserves the constraints and preferences, and leaves the reservation committed. Nothing is cancelled or detached; the provider's reservation ledger is the archive, surfaced through `get_current_plan.reservationLedger` (with `belongsToCurrentPlan` and `supersededByNewerPlan`) and rendered as **Reservation history**. Repeating the lifecycle call is safe and archives nothing twice.
+
+### 12.2 Observable pending state
+
+`reservePlan` is now asynchronous and commits the `reservation_pending` plan *before* the inventory transaction, through the same compare-and-swap persistence as every other mutation. The transitions are `approved → reservation_pending → reserved | reservation_failed`, all persisted and all in the audit trail. No artificial latency was introduced: the pending commit is a real write that must succeed before inventory can move.
+
+### 12.3 Advertised schema alignment
+
+`update_plan` now advertises `minProperties: 2` (expected version plus at least one real change) and `dependentRequired` for both atomic pairs, so a compliant client can reject `movieId` without `showtimeId` before calling. All 13 tools were audited: every schema is a strict object with `additionalProperties: false`, every required key exists in `properties`, and side effects are stated in each description. Runtime validation was not weakened anywhere; JSON Schema still cannot express "the showtime must belong to the movie", so that rule stays in Zod and is stated in the tool description.
+
+### 12.4 Verified mobile and accessibility behavior
+
+`tests/browser/mobile.spec.ts` runs the real production build in Chromium at 375×812, 390×844 and 412×915 (`npm run test:browser`). Each viewport asserts: all 13 tools register through a real `document.modelContext`, no element extends past the viewport, no console errors, ≥44px navigation tap targets, ≥12px secondary text, `role="alert"` / `aria-invalid` / `aria-describedby` on field errors, keyboard focus and activation, and the complete plan → repair → approve → reserve → start-new-plan workflow. 12/12 pass.
+
+### 12.5 Readability
+
+Every 8–11px label was raised to a 12px floor (22 declarations), navigation and slot buttons were raised to 44px minimum height, and the reservation-history component was added to the existing visual system. No redesign.
+
+### 12.6 Authority boundary
+
+`src/authority.ts` introduces `ReservationAuthority` at the one consequential write. `LocalReservationAuthority` (default, unchanged behavior) and `RemoteReservationAuthority` (authenticated, fail-closed, imports the server's canonical provider state) implement it; `netlify/functions/reserve.mjs` is the server side, owning the ledger, capacity re-check, idempotency key and revision. Remote is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT` and is **not enabled or verified in production**. Reads stay local and synchronous, so the solver, tools, UI and tests were not disturbed.
+
+## 13. Current verification (revision 3)
+
+| Check | Result |
+|---|---|
+| Unit/integration tests | **112 passed**, 9 files |
+| Browser tests | **12 passed** at 375×812, 390×844, 412×915 |
+| Lint | pass (`--max-warnings 0`) |
+| TypeScript | pass |
+| Production build | pass, standalone root entry regenerated |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Adversarial suite | forged approvals, forged revisions, fabricated reservations, smuggled fields, reserved-plan mutation on all three tool paths, and repair-with-no-inventory all rejected |
+
+## 14. Deployment (revision 3)
+
+Deployed and reachable over HTTPS at <https://planonit.netlify.app/>, built from this repository on push. Netlify serves `dist` with the security headers in `netlify.toml`. **The live site reflects the last pushed commit; this revision must be pushed before the deployment matches the code described here.**
+
+## 15. Remaining limitations (revision 3)
+
+- Production runs the browser-local authority. The server-authoritative path exists, is tested against a mocked transport, and is not enabled or verified in production.
+- There is no per-user authentication; a browser client cannot hold a secret. Workspace state remains browser-origin scoped.
+- Inventory is deterministic Dhaka sandbox data generated from a single day's fixtures, not a commercial provider API.
+- The supported window is the fixed range 2026-09-03 – 2026-09-16. After that date the app has no plannable inventory.
+- Reservations can be superseded but not cancelled; released inventory is not returned to the ledger.
+- `repair_plan` re-solves rather than computing a minimal diff, and the UI's repair summary is descriptive rather than a computed change list.

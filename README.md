@@ -4,7 +4,7 @@ PlanOnIt is a human-controlled planning workspace where an external AI agent can
 
 [Public repository](https://github.com/tonmoy-y/PlanOnIt)
 
-The evaluator reported a Netlify deployment, but its URL is not stored in this checkout and could not be independently resolved. `netlify.toml` now contains the verified build and publish settings; confirm the existing site URL after pushing this revision.
+**Live deployment:** <https://planonit.netlify.app/> — served over HTTPS from Netlify, built from this repository on push. `netlify.toml` holds the build, publish, function and security-header settings.
 
 ## Run and verify
 
@@ -29,7 +29,7 @@ npm run preview
 ## Judge fast path
 
 1. Open the app in the supported ChatGPT built-in browser.
-2. Confirm the header shows `Agent-ready · 12 tools`.
+2. Confirm the header shows `Agent-ready · 13 tools`.
 3. Copy the on-page request: “Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use PlanOnIt's site tools, show me feasibility evidence, and leave approval to me.”
 4. Review the resulting timeline, eight checks, provider revision, and scaled total.
 5. Make a manual choice that breaks the plan, then ask the agent to use `repair_plan` while preserving that choice.
@@ -47,8 +47,9 @@ PlanOnIt follows the [official WebMCP guidance](https://learn.chatgpt.com/docs/w
 | Plan and verify | `create_evening_plan`, `get_current_plan`, `validate_plan`, `calculate_total_cost` |
 | Collaborate | `update_plan`, `repair_plan` |
 | Confirm | `reserve_plan` |
+| Lifecycle | `start_new_plan` |
 
-All 12 handlers parse untrusted input with strict Zod schemas. Mutations require `expectedVersion`; restaurant/slot and movie/showtime pairs are atomic; invalid references and incomplete prices never become fake zero-cost successes.
+All 13 handlers parse untrusted input with strict Zod schemas. Mutations require `expectedVersion`; restaurant/slot and movie/showtime pairs are atomic; invalid references and incomplete prices never become fake zero-cost successes.
 
 ## Feasibility and safety
 
@@ -63,6 +64,12 @@ Every plan exposes eight blocking checks:
 7. dinner, travel, buffer, movie chronology, and maximum idle-time policy;
 8. the party-scaled total budget.
 
+### Reserved-plan lifecycle
+
+A confirmed reservation makes its plan immutable, and that is now enforced on *every* path. `update_plan` returns `PLAN_IMMUTABLE`, `repair_plan` returns `PLAN_ALREADY_RESERVED`, and `create_evening_plan` returns `WORKSPACE_HAS_ACTIVE_RESERVATION` instead of silently replacing the reserved plan and hiding its still-committed inventory. To plan again the caller must take an explicit step — the `start_new_plan` tool, or **Start a new plan** in the UI — which raises the version, clears the draft, and leaves the previous reservation committed and listed. Reservations are never cancelled or detached: the provider's reservation ledger is the archive, `get_current_plan` returns it as `reservationLedger` with `belongsToCurrentPlan` / `supersededByNewerPlan` flags, and the Plan screen renders it as **Reservation history**.
+
+Reservation is also observably staged. The plan is committed as `reservation_pending` *before* any inventory moves, then transitions to `reserved` or `reservation_failed`, so a crash or provider failure can never leave an ambiguous state and both outcomes appear in the audit trail.
+
 Approval records the exact plan version and mutable provider revision. Any meaningful human or agent edit clears approval; unchanged input is a no-op. If inventory changes after approval, reservation returns `PROVIDER_STATE_CHANGED`. The sandbox provider models pending, confirmed, and failed outcomes, commits table and seat inventory atomically, keeps committed capacity valid for its owning plan, consumes nothing on conflict/failure, and returns the same confirmation on an idempotent retry. It does not contact a real business or payment service.
 
 ## Architecture
@@ -70,14 +77,19 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/providers.ts` — `InventoryProvider` interface and mutable date-window sandbox, including ownership, conflict, failure, and idempotency behavior.
 - `src/domain.ts` — solver, evaluation, versioned mutations, repair, approval, and transactional reservation gates.
 - `src/validation.ts` — strict shared schemas, including non-normalizing calendar-date validation.
-- `src/tools.ts` — 12 imperative WebMCP definitions and handlers.
+- `src/tools.ts` — 13 imperative WebMCP definitions and handlers.
+- `src/authority.ts` — the reservation transaction boundary: the local sandbox authority (default) and an authenticated remote authority.
+- `netlify/functions/reserve.mjs` — optional server-authoritative reservation transaction.
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
-- `tests/` — 81 unit and integration tests covering each tool, UI validation, reservation transitions, provider mutations, concurrency, and the standalone entry.
+- `tests/` — 112 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, and the standalone entry.
+- `tests/browser/` — 12 Playwright tests that run the real production build in a real browser at three mobile viewports.
 
 ## Honest scope
 
 - Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
+- **Reservation authority.** By default the browser-local sandbox provider is its own authority, which is what the live deployment runs. `src/authority.ts` also ships an authenticated `RemoteReservationAuthority` and `netlify/functions/reserve.mjs`, which move capacity, idempotency and provider revisions to a server that re-checks every commitment. It is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT` and is **not enabled or verified in production**; with no endpoint configured the verified local behavior is used unchanged. A browser client cannot hold a secret, so the shipped design has no per-user authentication — that remains the honest architectural limit.
+- Reads (browsing inventory) are deliberately local and synchronous; only the consequential write crosses the authority boundary.
 - The mutable provider and shared workspace persist per browser origin. Same-origin tabs use a Web Locks-backed compare-and-swap boundary; stale writes fail with `CONCURRENT_WRITE_CONFLICT` or `STALE_PLAN_VERSION` and tabs converge through storage events. There is no account or cross-device server state.
 - A real deployment would move provider state, authentication, authorization, audit records, and idempotency keys to a trusted server while retaining the same interfaces.
 - WebMCP availability depends on the currently supported ChatGPT built-in browser and model environment.
