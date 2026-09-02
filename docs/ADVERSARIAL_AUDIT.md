@@ -20,6 +20,8 @@
 | Forge an approval or provider revision | `HUMAN_APPROVAL_REQUIRED` / `PROVIDER_STATE_CHANGED`. |
 | Fabricate a reservation object on a plan | The reservation-ownership check finds no matching provider commitment and the plan is invalid. |
 | Smuggle `status` or `approval` through `update_plan` | Strict schema rejects unknown keys with `INVALID_INPUT`. |
+| Leave the demo open until its date passes | The plan stops being currently valid with a plain-language `date_window` failure, and a confirmed reservation is verified against the ledger instead of being reported as forged. |
+| Start a new plan after the window rolls | The fresh plan opens on a currently supported date, not the stale one. |
 | Tool client skips JSON Schema | Every handler parses a strict Zod schema; every tool has malformed and success-path tests. |
 | Provider state is malformed in storage | The entire provider envelope has a strict schema and invalid provider state is discarded. |
 
@@ -33,4 +35,4 @@ npm run build
 npm audit --omit=dev
 ```
 
-Current result (revision 5): **168 unit/integration tests pass (11 files)** and **21 real-browser Playwright tests pass** (7 scenarios x 3 mobile viewports, executed against the production build in Chromium 151). Lint, typecheck, production build and `npm audit` are clean, and the browser discovers and invokes **13** live imperative tools. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are still **not** claimed as verified.
+Current result (revision 5): **181 unit/integration tests pass (12 files)** and **21 real-browser Playwright tests pass** (7 scenarios x 3 mobile viewports, executed against the production build in Chromium 151). Lint, typecheck, production build and `npm audit` are clean, and the browser discovers and invokes **13** live imperative tools. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are still **not** claimed as verified.

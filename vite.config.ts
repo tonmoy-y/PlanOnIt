@@ -18,5 +18,6 @@ export default defineConfig({
   test: {
     // Vitest owns the unit/integration suite; tests/browser belongs to Playwright.
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/browser/**'],
+    setupFiles: ['./tests/setup.ts'],
   }
 });

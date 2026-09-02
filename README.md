@@ -100,7 +100,7 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
-- `tests/` — 168 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/` — 181 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
 - `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
 
 ### Reset
@@ -110,6 +110,12 @@ Approval records the exact plan version and mutable provider revision. Any meani
 states plainly what it does *not* do — a reset never cancels a sandbox reservation that was already committed.
 Confirmed reservations stay in the provider ledger, and the new plan's version continues forward so it can never
 collide with a previous commitment.
+
+## Inventory window
+
+The supported planning window is **rolling**: it opens two days after the current date and runs for fourteen days, so the demo cannot expire. The window is computed at validation time, advertised in the WebMCP `date` enums, and enforced identically by the provider, so a date the schema accepts is always a date the provider can serve. Tests pin the window origin (`setPlanningWindowOrigin`) so date-sensitive assertions stay deterministic; production follows the real clock.
+
+When an evening's date falls behind the window, the plan stops being currently valid — the leading check says *"This evening has passed"* — but a confirmed reservation is **not** reported as an integrity failure: it is compared against the immutable ledger record and stays committed and visible. Starting a new plan from a passed evening opens on a currently supported date.
 
 ## Honest scope
 

@@ -7,7 +7,7 @@ import { compareAndSwapState, loadState, resetWorkspace, subscribeState } from '
 import { demoProvider } from './providers';
 import { buildTools, toolNames } from './tools';
 import { Activity, ActivitySource, Plan, Preferences, Reservation, Tab, ToolError } from './types';
-import { constraintsSchema, parseInput } from './validation';
+import { constraintsSchema, parseInput, planningWindow } from './validation';
 
 const money=(value:number|null|undefined)=>value==null?'—':`৳${value.toLocaleString('en-IN')}`;
 const prettyTime=(value?:string)=>value?new Date(`2026-01-01T${value}:00`).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';
@@ -151,7 +151,7 @@ function ConstraintEditor({plan,update,changeDate}:{plan:Plan;update:(change:Rec
   return <div className={`constraint-editor ${locked?'locked':''}`}>
     {locked&&<p className="locked-note" role="status"><Lock/> {immutableReason(plan)}</p>}
     <label><span><MapPin/> City</span><select aria-label="City" value={plan.city} disabled><option>Dhaka</option></select></label>
-    <label><span><CalendarDays/> Date</span><input aria-label="Date" type="date" disabled={locked} min="2026-09-03" max="2026-09-16" value={plan.date} aria-invalid={Boolean(errors.date)} aria-describedby={errors.date?'date-error':undefined} onChange={event=>void onDate(event.target.value)}/>{errors.date&&<small id="date-error" className="field-error" role="alert">{errors.date}</small>}</label>
+    <label><span><CalendarDays/> Date</span><input aria-label="Date" type="date" disabled={locked} min={planningWindow().start} max={planningWindow().end} value={plan.date} aria-invalid={Boolean(errors.date)} aria-describedby={errors.date?'date-error':undefined} onChange={event=>void onDate(event.target.value)}/>{errors.date&&<small id="date-error" className="field-error" role="alert">{errors.date}</small>}</label>
     <label><span><Utensils/> People</span><input aria-label="People" type="number" disabled={locked} min="1" max="12" value={people} aria-invalid={Boolean(errors.people)} aria-describedby={errors.people?'people-error':undefined} onChange={event=>setPeople(event.target.value)} onBlur={()=>void commitNumber('people',people)}/>{errors.people&&<small id="people-error" className="field-error" role="alert">{errors.people}</small>}</label>
     <label><span><CircleDollarSign/> Budget</span><input aria-label="Budget" type="number" disabled={locked} min="500" max="100000" step="100" value={budget} aria-invalid={Boolean(errors.budget)} aria-describedby={errors.budget?'budget-error':undefined} onChange={event=>setBudget(event.target.value)} onBlur={()=>void commitNumber('budget',budget)}/>{errors.budget&&<small id="budget-error" className="field-error" role="alert">{errors.budget}</small>}</label>
     <label><span><Star/> Cuisine preference</span><select aria-label="Cuisine preference" disabled={locked} value={plan.preferences.cuisine??''} onChange={event=>patchPreferences({cuisine:event.target.value||undefined})}><option value="">Any cuisine</option>{[...new Set(restaurants.map(item=>item.cuisine))].map(item=><option key={item}>{item}</option>)}</select></label>

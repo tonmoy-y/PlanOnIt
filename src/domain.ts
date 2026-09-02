@@ -3,7 +3,7 @@ import { defaultPreferences, initialPlan } from './data';
 import { reservationFingerprint, reservationIntent, restaurantInventoryKey } from './intent';
 import { demoProvider, InventoryProvider } from './providers';
 import { FeasibilityCheck, Plan, PlanEvaluation, PlannerResult, PlanSnapshot, Preferences, Reservation, ToolError, ToolResult } from './types';
-import { fail, ok, parseInput, updatePlanSchema } from './validation';
+import { fail, ok, parseInput, planningWindow, updatePlanSchema } from './validation';
 
 export interface PlannerInput {city:'Dhaka';date:string;people:number;budget:number;preferences:Preferences;dinnerDurationMinutes:number;bufferMinutes:number;}
 export interface PlanUpdate {expectedVersion:number;restaurantId?:string;restaurantSlot?:string;movieId?:string;showtimeId?:string;transportOptionId?:string;budget?:number;people?:number;preferences?:Preferences;}
@@ -36,10 +36,21 @@ export const immutableError=(plan:Plan)=>fail(plan.status==='reservation_pending
  * replayed or forged record can satisfy those while pointing at different inventory,
  * which is exactly the state that must never render as "Reserved · confirmed".
  */
+/** A date can leave the rolling window simply because time passed; that is not tampering. */
+export const dateOutsideWindow=(date:string)=>{const {start,end}=planningWindow();return date<start||date>end;};
+
 export function reservationOwnership(plan:Plan,provider:InventoryProvider=demoProvider):{ok:boolean;message:string;failures:string[]}{
   if(plan.status!=='reserved')return {ok:true,message:'No provider commitment is required before reservation.',failures:[]};
   const record=plan.reservation;const failures:string[]=[];
   if(!record||record.status!=='confirmed')return {ok:false,message:'Reserved state carries no confirmed reservation record.',failures:['missing confirmed reservation record']};
+  // The evening has simply passed: live inventory can no longer be projected for that date, so
+  // compare the immutable ledger record instead of accusing a genuine reservation of forgery.
+  if(dateOutsideWindow(plan.date)){
+    const archived=provider.getReservation(plan);
+    return archived&&archived.id===record.id&&archived.fingerprint===record.fingerprint
+      ?{ok:true,message:`This evening has passed. Reservation ${record.id} stays committed in the ledger for version ${plan.version}.`,failures:[]}
+      :{ok:false,message:'Reserved state has no matching provider commitment.',failures:['no provider commitment exists for this plan version']};
+  }
   const expected=reservationFingerprint(plan,provider);const intent=reservationIntent(plan,provider);
   const persisted=provider.getReservation(plan);
   if(record.planId!==plan.id)failures.push('reservation belongs to a different plan');
@@ -70,6 +81,8 @@ export function evaluatePlan(plan:Plan,provider:InventoryProvider=demoProvider):
   const restaurant=provider.getRestaurant(selected.restaurantId); const movie=provider.getMovie(selected.movieId); const showtime=provider.showtimeSnapshot(selected.showtimeId,plan); const cinema=provider.getCinema(showtime?.cinemaId);
   const route=provider.getRoute(restaurant?.locationId,cinema?.locationId); const transport=provider.getTransportOption(route,selected.transportOptionId);
   const checks:FeasibilityCheck[]=[];
+  const outsideWindow=dateOutsideWindow(plan.date);
+  checks.push(check('date_window','Planning date',!outsideWindow,outsideWindow?`${plan.date} is outside the supported window (${planningWindow().start} to ${planningWindow().end}). This evening has passed — start a new plan to choose a current date.`:`${plan.date} is inside the supported window.`));
   checks.push(check('complete','Plan completeness',Boolean(restaurant&&selected.restaurantSlot&&movie&&showtime&&cinema&&transport),restaurant&&selected.restaurantSlot&&movie&&showtime&&cinema&&transport?'All required services are selected.':'Restaurant slot, movie showtime, and route transport are all required.'));
   checks.push(check('city','City consistency',Boolean(restaurant?.city===plan.city&&cinema?.city===plan.city),restaurant&&cinema?`${restaurant.city} restaurant and ${cinema.city} cinema match ${plan.city}.`:'Selected providers must exist in the plan city.'));
   const slot=restaurant&&provider.restaurantSlots(restaurant,plan.date,plan).find(item=>item.time===selected.restaurantSlot);
@@ -238,7 +251,8 @@ export function startNewPlan(plan:Plan,expectedVersion:number,provider:Inventory
   if(expectedVersion!==plan.version)return fail('STALE_PLAN_VERSION',`Expected version ${expectedVersion}, but current version is ${plan.version}.`,'expectedVersion',true);
   if(plan.status==='reservation_pending')return fail('RESERVATION_IN_PROGRESS','A reservation attempt is still resolving. Retry once it settles.',undefined,true);
   const archivedReservation=hasActiveReservation(plan)?plan.reservation:undefined;
-  const next:Plan={...createBlankPlan({city:plan.city,date:plan.date,people:plan.people,budget:plan.budget}),preferences:plan.preferences,version:plan.version+1,status:'draft',updatedAt:newTimestamp(),changeSummary:archivedReservation?`Started a new plan; reservation ${archivedReservation.id} stays committed to version ${archivedReservation.version}`:'Started a new plan'};
+  const carriedDate=dateOutsideWindow(plan.date)?createBlankPlan().date:plan.date;
+  const next:Plan={...createBlankPlan({city:plan.city,date:carriedDate,people:plan.people,budget:plan.budget}),preferences:plan.preferences,version:plan.version+1,status:'draft',updatedAt:newTimestamp(),changeSummary:archivedReservation?`Started a new plan; reservation ${archivedReservation.id} stays committed to version ${archivedReservation.version}`:'Started a new plan'};
   return ok({plan:next,archivedReservation,reservationLedger:provider.listReservations()});
 }
 

@@ -6,8 +6,25 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/,'Must use YYYY-
   const candidate=new Date(Date.UTC(year,month-1,day));
   return candidate.getUTCFullYear()===year&&candidate.getUTCMonth()===month-1&&candidate.getUTCDate()===day;
 },'Invalid calendar date');
-export const PLANNING_WINDOW={start:'2026-09-03',end:'2026-09-16'} as const;
-export const planningDateSchema=dateSchema.refine(value=>value>=PLANNING_WINDOW.start&&value<=PLANNING_WINDOW.end,`Date must be between ${PLANNING_WINDOW.start} and ${PLANNING_WINDOW.end}`);
+/**
+ * Rolling inventory window.
+ *
+ * The window used to be two hard-coded dates, which meant the demo became unusable the day
+ * after they passed. It is now derived from the current date, so the supported range always
+ * exists. Tests pin the origin with `setPlanningWindowOrigin` so date-sensitive assertions
+ * stay deterministic; production leaves it unset and follows the real clock.
+ */
+export const PLANNING_WINDOW_LEAD_DAYS=2;
+export const PLANNING_WINDOW_DAYS=14;
+let planningWindowOrigin:string|undefined;
+export const setPlanningWindowOrigin=(isoDate?:string)=>{planningWindowOrigin=isoDate;};
+const isoToday=()=>planningWindowOrigin??new Date().toISOString().slice(0,10);
+export const addCalendarDays=(isoDate:string,days:number)=>{const date=new Date(`${isoDate}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);};
+export const planningWindow=()=>{const start=addCalendarDays(isoToday(),PLANNING_WINDOW_LEAD_DAYS);return {start,end:addCalendarDays(start,PLANNING_WINDOW_DAYS-1)};};
+export const planningWindowDates=()=>{const {start}=planningWindow();return Array.from({length:PLANNING_WINDOW_DAYS},(_,index)=>addCalendarDays(start,index));};
+/** Live view of the current window; reads reflect the clock (or the pinned test origin). */
+export const PLANNING_WINDOW={get start(){return planningWindow().start;},get end(){return planningWindow().end;}};
+export const planningDateSchema=dateSchema.superRefine((value,ctx)=>{const {start,end}=planningWindow();if(value<start||value>end)ctx.addIssue({code:'custom',message:`Date must be between ${start} and ${end}`});});
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/,'Must use 24-hour HH:mm');
 const city = z.literal('Dhaka',{error:'Only Dhaka is available in this demo'});
 const people = z.number().int('People must be a whole number').min(1,'At least 1 person is required').max(12,'This sandbox supports at most 12 people');

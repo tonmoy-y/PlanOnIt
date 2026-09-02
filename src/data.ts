@@ -1,4 +1,8 @@
 import { Cinema, Location, Movie, Plan, Restaurant, Route, Showtime } from './types';
+import { addCalendarDays, planningWindow } from './validation';
+
+/** The fixtures describe one template day; the provider projects it onto every supported date. */
+export const TEMPLATE_DATE='2026-09-04';
 
 export const locations: Location[] = [
   { id: 'dhanmondi-27', name: 'Dhanmondi 27', area: 'Dhanmondi', city: 'Dhaka' },
@@ -68,7 +72,7 @@ export const routes: Route[] = [
 
 export const defaultPreferences = (): Plan['preferences'] => ({ transport:'lowest_cost', priority:'balanced', timing:'relaxed', minRestaurantRating:4.2 });
 export const initialPlan = (): Plan => ({
-  id:'current-plan', version:1, city:'Dhaka', date:'2026-09-04', people:3, budget:5000,
+  id:'current-plan', version:1, city:'Dhaka', date:addCalendarDays(planningWindow().start,1), people:3, budget:5000,
   preferences:defaultPreferences(), dinnerDurationMinutes:75, bufferMinutes:15, selections:{},
   status:'draft', updatedAt:new Date().toISOString(), changeSummary:'Started a new evening plan'
 });

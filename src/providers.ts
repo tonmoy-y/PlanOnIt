@@ -1,4 +1,4 @@
-import { cinemas, locations, movies, restaurants, routes, showtimes } from './data';
+import { cinemas, locations, movies, restaurants, routes, showtimes, TEMPLATE_DATE } from './data';
 import { reservationFingerprint, reservationLedgerKey } from './intent';
 import { InventoryState, Plan, ProviderState, Reservation, Restaurant, RestaurantSlot, Route, Showtime, ToolResult } from './types';
 import { fail, ok, PLANNING_WINDOW } from './validation';
@@ -44,8 +44,8 @@ export class MutableDemoProvider implements InventoryProvider {
 
   private generatedShowtimes(date:string){
     if(!this.supportsDate(date))return [];
-    return showtimes.filter(item=>item.date==='2026-09-04').map(item=>{
-      const id=item.id.replace('2026-09-04',date);
+    return showtimes.filter(item=>item.date===TEMPLATE_DATE).map(item=>{
+      const id=item.id.replace(TEMPLATE_DATE,date);
       const dateAdjustment=(Number(date.slice(-2))+item.startTime.charCodeAt(0))%4;
       return {...item,id,date,seatsRemaining:this.state.showtimeSeats[id]??Math.max(4,item.seatsRemaining-dateAdjustment)};
     });
@@ -70,7 +70,7 @@ export class MutableDemoProvider implements InventoryProvider {
   restaurantSlots(restaurant:Restaurant,date:string,plan?:Plan){
     if(!this.supportsDate(date))return [];
     const reservation=plan&&this.getReservation(plan);
-    return restaurant.slots.filter(item=>item.date==='2026-09-04').map(item=>{
+    return restaurant.slots.filter(item=>item.date===TEMPLATE_DATE).map(item=>{
       const key=restaurantKey(restaurant.id,date,item.time);
       const dateAdjustment=(Number(date.slice(-2))+restaurant.id.length+item.time.charCodeAt(0))%3;
       const capacityRemaining=this.state.restaurantCapacity[key]??Math.max(2,item.capacityRemaining-dateAdjustment);

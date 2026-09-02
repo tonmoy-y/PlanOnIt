@@ -273,3 +273,28 @@ Two defects introduced by the revision-3 authority layer were found and fixed. T
 | Production build | `npm run build` | pass, standalone entry regenerated |
 | Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities |
 | Adversarial probe | ad-hoc | 13 tools; fingerprint differs on restaurant/slot/showtime/date/party/version and matches only on identical intent; swapped selections under a real reservation fail integrity; a stolen reservation record fails; `update`/`repair`/`create` all blocked in both `reserved` and `reservation_pending`; `start_new_plan` never inherits the old reservation; no approval tool exists |
+
+
+---
+
+## 15. Revision 6 — the demo can no longer expire
+
+The inventory window was two hard-coded dates (`2026-09-03` .. `2026-09-16`). Every earlier report listed this as a limitation; it was in fact a scheduled outage — the day after the range passed, no date would validate and the app had nothing to plan.
+
+**Rolling window.** `planningWindow()` now derives the range from the current date (`today + 2`, fourteen days). It is evaluated at validation time, advertised in the WebMCP `date` enums at registration time, and enforced by the provider through the same function, so schema and provider can never disagree. The fixtures remain one template day (`TEMPLATE_DATE`) that the provider projects onto whichever dates are supported. `setPlanningWindowOrigin` pins the origin under test, which reproduces the historical window exactly — all 168 pre-existing tests passed unchanged.
+
+**Two defects found by adversarial probing of the new behavior, both fixed:**
+
+- A confirmed reservation whose evening had passed reported *"Reservation integrity failure: reservation intent does not match…"* — a genuine commitment accused of forgery, because live inventory could no longer be projected for that date. Ownership now compares the immutable ledger record when the date is outside the window, so a real reservation reads as *"This evening has passed. Reservation … stays committed in the ledger"*, while a forged one still fails. A new leading `date_window` check states the real reason the plan is no longer current.
+- `start_new_plan` carried the stale date into the fresh plan, so the new plan opened outside the window and could not be solved. It now opens on a currently supported date.
+
+### Revision 6 verification
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npx vitest run` | **181 passed / 181**, 12 files |
+| Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151, production build |
+| Lint | `npx eslint src tests --max-warnings 0` | pass |
+| TypeScript | `npx tsc -b` | pass |
+| Production build | `npm run build` | pass |
+| Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities |
