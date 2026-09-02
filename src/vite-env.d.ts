@@ -3,5 +3,6 @@ interface ModelContext { registerTool(tool: WebMCPTool, options?: { signal?: Abo
 interface WebMCPTool { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, unknown>; execute: (input: unknown, client?: { signal?: AbortSignal }) => Promise<unknown>; }
 interface Document { modelContext?: ModelContext; }
 
-interface ImportMetaEnv { readonly VITE_PLANONIT_AUTHORITY_ENDPOINT?: string; readonly VITE_PLANONIT_AUTHORITY_TOKEN?: string; }
+// No credential is ever read into the browser bundle: anything prefixed VITE_ is public.
+interface ImportMetaEnv { readonly VITE_PLANONIT_AUTHORITY_ENDPOINT?: string; }
 interface ImportMeta { readonly env: ImportMetaEnv; }

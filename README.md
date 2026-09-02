@@ -95,12 +95,12 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/domain.ts` — solver, evaluation, versioned mutations, repair, approval, and transactional reservation gates.
 - `src/validation.ts` — strict shared schemas, including non-normalizing calendar-date validation.
 - `src/tools.ts` — 13 imperative WebMCP definitions and handlers.
-- `src/authority.ts` — the reservation transaction boundary: the local sandbox authority (default) and an authenticated remote authority.
+- `src/authority.ts` — the reservation transaction boundary: the local sandbox authority (default) and a token-authenticated, server-to-server remote authority.
 - `netlify/functions/reserve.mjs` — optional server-authoritative reservation transaction.
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
-- `tests/` — 161 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/` — 168 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
 - `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
 
 ### Reset
@@ -114,7 +114,9 @@ collide with a previous commitment.
 ## Honest scope
 
 - Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
-- **Reservation authority.** By default the browser-local sandbox provider is its own authority, which is what the live deployment runs. `src/authority.ts` also ships an authenticated `RemoteReservationAuthority` and `netlify/functions/reserve.mjs`, which move capacity, idempotency and provider revisions to a server that re-checks every commitment. It is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT` and is **not enabled or verified in production**; with no endpoint configured the verified local behavior is used unchanged. A browser client cannot hold a secret, so the shipped design has no per-user authentication — that remains the honest architectural limit.
+- **Reservation authority.** By default the browser-local sandbox provider is its own authority, and that is what the live deployment runs. `src/authority.ts` also ships `RemoteReservationAuthority` and `netlify/functions/reserve.mjs`, which move capacity, idempotency and provider revisions to a server that re-checks every commitment and writes the ledger with a conditional `onlyIfMatch` compare-and-swap (a losing concurrent commit gets `AUTHORITY_REVISION_CONFLICT`, not a silent overwrite).
+- **The remote authority is deliberately not reachable from the browser.** It requires a bearer token, and no credential is ever read into the client bundle — anything prefixed `VITE_` is public, so shipping a shared secret there would be authentication theatre. The endpoint is therefore usable only by trusted server-side callers, is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT`, and is **not enabled or verified in production**. With no endpoint configured the verified local behavior runs unchanged.
+- There is no per-user identity or authentication. That is the honest architectural limit of a browser-only app, and it is why this build does not claim server-authoritative state.
 - Reads (browsing inventory) are deliberately local and synchronous; only the consequential write crosses the authority boundary.
 - The mutable provider and shared workspace persist per browser origin. Same-origin tabs use a Web Locks-backed compare-and-swap boundary; stale writes fail with `CONCURRENT_WRITE_CONFLICT` or `STALE_PLAN_VERSION` and tabs converge through storage events. There is no account or cross-device server state.
 - A real deployment would move provider state, authentication, authorization, audit records, and idempotency keys to a trusted server while retaining the same interfaces.

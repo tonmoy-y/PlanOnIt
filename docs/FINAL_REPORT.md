@@ -97,13 +97,13 @@ Every 8–11px label was raised to a 12px floor (22 declarations), navigation an
 
 ### 12.6 Authority boundary
 
-`src/authority.ts` introduces `ReservationAuthority` at the one consequential write. `LocalReservationAuthority` (default, unchanged behavior) and `RemoteReservationAuthority` (authenticated, fail-closed, imports the server's canonical provider state) implement it; `netlify/functions/reserve.mjs` is the server side, owning the ledger, capacity re-check, idempotency key and revision. Remote is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT` and is **not enabled or verified in production**. Reads stay local and synchronous, so the solver, tools, UI and tests were not disturbed.
+`src/authority.ts` introduces `ReservationAuthority` at the one consequential write. `LocalReservationAuthority` (default, unchanged behavior) and `RemoteReservationAuthority` (token-authenticated, fail-closed, imports the server's canonical provider state) implement it; `netlify/functions/reserve.mjs` is the server side, owning the ledger, capacity re-check, idempotency key and revision. Remote is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT` and is **not enabled or verified in production**. Reads stay local and synchronous, so the solver, tools, UI and tests were not disturbed. *(Revision 5 corrected two defects in this layer — see section 14.)*
 
 ## 13. Current verification (revision 3)
 
 | Check | Result |
 |---|---|
-| Unit/integration tests | **112 passed**, 9 files |
+| Unit/integration tests | **112 passed**, 9 files *(revision 3 figure — see revision 5)* |
 | Browser tests | **12 passed** at 375×812, 390×844, 412×915 *(revision 3 figure)* |
 | Lint | pass (`--max-warnings 0`) |
 | TypeScript | pass |
@@ -179,7 +179,7 @@ line when it differs from the message.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Unit + integration | `npx vitest run` | **161 passed / 161**, 10 files |
+| Unit + integration | `npx vitest run` | **168 passed / 168**, 11 files |
 | Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151.0.7922.34 against the production preview build |
 | TypeScript | `tsc -b` | clean |
 | Lint | `eslint src tests --max-warnings 0` | clean |
@@ -250,3 +250,26 @@ consuming inventory, promotion from a matching ledger entry, refusal of a mismat
 entry, no effect on any other status, idempotence on repeat), one jsdom reload test in
 `tests/app.test.tsx`, and one real-browser reload test in `tests/browser/mobile.spec.ts`
 running at all three mobile viewports.
+
+
+---
+
+## 14. Revision 5 — authority security and transaction correctness
+
+Two defects introduced by the revision-3 authority layer were found and fixed. The rest of the revision-4 audit findings (pending-state immutability, the in-flight reservation race, content-blind idempotency, duplicated toast text) were re-verified as already fixed before any change was made, and were not touched.
+
+**Public bearer secret removed.** The client resolved its authority with `token: import.meta.env.VITE_PLANONIT_AUTHORITY_TOKEN`. Every `VITE_`-prefixed value is inlined into the public bundle, so that would have shipped a shared workspace secret to every visitor while describing the endpoint as authenticated. The client now passes an endpoint only; `token` remains on `RemoteAuthorityOptions` for trusted server-side callers. The consequence is stated rather than hidden: because the function requires a bearer token and a browser cannot hold one, the remote authority is **not** usable from the deployed app, which is exactly why it ships disabled.
+
+**Read-then-write replaced with a real compare-and-swap.** The function read the ledger, re-read it, compared revisions and wrote — a TOCTOU window that could lose a concurrent commitment while being described as transactional. It now reads with `getWithMetadata` and writes with `setJSON(..., { onlyIfMatch: etag })` (`onlyIfNew` when the ledger is absent); a rejected conditional write returns `AUTHORITY_REVISION_CONFLICT`.
+
+### Revision 5 verification
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npx vitest run` | **168 passed / 168**, 11 files |
+| Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151 against the production build |
+| Lint | `npx eslint src tests --max-warnings 0` | pass |
+| TypeScript | `npx tsc -b` | pass |
+| Production build | `npm run build` | pass, standalone entry regenerated |
+| Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities |
+| Adversarial probe | ad-hoc | 13 tools; fingerprint differs on restaurant/slot/showtime/date/party/version and matches only on identical intent; swapped selections under a real reservation fail integrity; a stolen reservation record fails; `update`/`repair`/`create` all blocked in both `reserved` and `reservation_pending`; `start_new_plan` never inherits the old reservation; no approval tool exists |

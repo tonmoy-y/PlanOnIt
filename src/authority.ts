@@ -22,6 +22,12 @@ export class LocalReservationAuthority implements ReservationAuthority {
   async commit(plan:Plan){return this.provider.reserve(plan);}
 }
 
+/**
+ * `token` exists for trusted server-to-server callers only. A browser bundle is public, so the
+ * client build never supplies one — which means a token-protected authority cannot be driven
+ * from the browser at all. That is deliberate: it is the honest consequence of having no user
+ * identity, and it is why the remote authority ships disabled rather than half-authenticated.
+ */
 export interface RemoteAuthorityOptions {endpoint:string;token?:string;fetchImpl?:typeof fetch;timeoutMs?:number;}
 
 /**
@@ -66,5 +72,6 @@ export class RemoteReservationAuthority implements ReservationAuthority {
  * when an endpoint is configured, so an unconfigured deployment keeps the verified local behavior.
  */
 export function resolveAuthority(provider:InventoryProvider,env:{endpoint?:string;token?:string}={}):ReservationAuthority{
+  // Browser callers pass an endpoint and no token; only server-side callers may pass a token.
   return env.endpoint?new RemoteReservationAuthority({endpoint:env.endpoint,token:env.token}):new LocalReservationAuthority(provider);
 }

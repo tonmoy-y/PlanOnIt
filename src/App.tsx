@@ -30,7 +30,7 @@ export default function App(){
   const [syncMessage,setSyncMessage]=useState(restored.resolved==='reserved'?'An interrupted reservation was recovered from the provider ledger.':restored.resolved==='failed'?'An interrupted reservation attempt was released; no inventory was consumed.':'This browser tab is current.');
   const [webmcp,setWebmcp]=useState<WebMcpState>(()=>typeof document.modelContext?.registerTool==='function'?'registering':'unavailable');
   const [toast,setToast]=useState<{tone:'ok'|'error';text:string}|null>(null);
-  const authority=useMemo(()=>resolveAuthority(demoProvider,{endpoint:import.meta.env.VITE_PLANONIT_AUTHORITY_ENDPOINT,token:import.meta.env.VITE_PLANONIT_AUTHORITY_TOKEN}),[]);
+  const authority=useMemo(()=>resolveAuthority(demoProvider,{endpoint:import.meta.env.VITE_PLANONIT_AUTHORITY_ENDPOINT}),[]);
   const planRef=useRef(plan);const activityRef=useRef(activity);const writerId=useRef(uid());
   const snapshot=useMemo(()=>{void providerTick;return snapshotPlan(plan,demoProvider);},[plan,providerTick]);
 
