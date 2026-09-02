@@ -35,8 +35,8 @@ describe('shared browser workspace',()=>{
     expect(budget?.getAttribute('aria-invalid')).toBe('true');expect(budget?.getAttribute('aria-describedby')).toBe('budget-error');expect(container.querySelector('#budget-error')?.getAttribute('role')).toBe('alert');
   });
   it('does not create activity or a version when an unchanged field blurs',async()=>{await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});const budget=container.querySelector<HTMLInputElement>('input[aria-label="Budget"]')!;await act(async()=>{budget.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,0));});expect(JSON.parse(localStorage.getItem('planonit.state.v5')??'{}')).toMatchObject({plan:{version:1,budget:5000},activity:[]});});
-  it('shows repair evidence after a human constraint breaks an agent plan',async()=>{await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});const create=registered.find(tool=>tool.name==='create_evening_plan')!;const update=registered.find(tool=>tool.name==='update_plan')!;await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});await update.execute({expectedVersion:2,budget:4200});});await act(async()=>{container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});expect(container.textContent).toContain('PLAN NEEDS ATTENTION');const repair=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Repair plan now'));expect(repair).toBeDefined();await act(async()=>{repair?.click();await new Promise(resolve=>setTimeout(resolve,0));});expect(container.textContent).toContain('PLAN REPAIRED');expect(container.textContent).toContain('Budget and schedule checks now pass');});
-  it('keeps approval human-only and shows confirmation after the explicit clicks',async()=>{await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});const create=registered.find(tool=>tool.name==='create_evening_plan')!;await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});const approve=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Approve this plan'));expect(approve).toBeDefined();await act(async()=>{approve?.click();await new Promise(resolve=>setTimeout(resolve,0));});const confirm=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Confirm sandbox reservation'));expect(confirm).toBeDefined();await act(async()=>{confirm?.click();await new Promise(resolve=>setTimeout(resolve,0));});expect(container.textContent).toContain('Reserved · confirmed');expect(container.textContent).toContain('committed to version');expect(container.textContent).toContain('RESERVATION HISTORY');});
+  it('shows repair evidence after a human constraint breaks an agent plan',async()=>{await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});const create=registered.find(tool=>tool.name==='create_evening_plan')!;const update=registered.find(tool=>tool.name==='update_plan')!;await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});await update.execute({expectedVersion:2,budget:4200});});await act(async()=>{container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});expect(container.textContent).toContain('NEEDS A FIX');const repair=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Fix this for me'));expect(repair).toBeDefined();await act(async()=>{repair?.click();await new Promise(resolve=>setTimeout(resolve,0));});expect(container.textContent).toContain('PLAN REPAIRED');expect(container.textContent).toContain('Timing and budget now work');});
+  it('keeps approval human-only and shows confirmation after the explicit clicks',async()=>{await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});const create=registered.find(tool=>tool.name==='create_evening_plan')!;await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});const approve=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Approve this evening'));expect(approve).toBeDefined();await act(async()=>{approve?.click();await new Promise(resolve=>setTimeout(resolve,0));});const confirm=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('Book this evening'));expect(confirm).toBeDefined();await act(async()=>{confirm?.click();await new Promise(resolve=>setTimeout(resolve,0));});expect(container.textContent).toContain('Reserved · confirmed');expect(container.textContent).toMatch(/SBX-CURRENT-PLAN-V\d+/);expect(container.textContent).toContain('3 people');expect(container.textContent).toContain('YOUR BOOKINGS');});
   it('presents restaurants by opening window and price band instead of raw capacity',async()=>{
     await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});
     await act(async()=>{container.querySelector<HTMLButtonElement>('nav button:nth-child(2)')?.click();});
@@ -54,11 +54,11 @@ describe('shared browser workspace',()=>{
     const create=registered.find(tool=>tool.name==='create_evening_plan')!;
     await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});
     const click=async(label:string)=>{const button=[...container.querySelectorAll('button')].find(item=>item.textContent?.includes(label));expect(button,label).toBeDefined();await act(async()=>{button?.click();await new Promise(resolve=>setTimeout(resolve,0));});};
-    await click('Approve this plan');
-    await click('Confirm sandbox reservation');
+    await click('Approve this evening');
+    await click('Book this evening');
     expect(container.textContent).toContain('Reserved · confirmed');
-    expect([...container.querySelectorAll('button')].some(item=>item.textContent?.includes('Repair plan now'))).toBe(false);
-    expect([...container.querySelectorAll('button')].some(item=>item.textContent?.includes('Edit choices'))).toBe(false);
+    expect([...container.querySelectorAll('button')].some(item=>item.textContent?.includes('Fix this for me'))).toBe(false);
+    expect([...container.querySelectorAll('button')].some(item=>item.textContent?.includes('Change my choices'))).toBe(false);
     await act(async()=>{container.querySelector<HTMLButtonElement>('nav button:nth-child(1)')?.click();});
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Budget"]')?.disabled).toBe(true);
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Date"]')?.disabled).toBe(true);
@@ -74,8 +74,8 @@ describe('shared browser workspace',()=>{
     const create=registered.find(tool=>tool.name==='create_evening_plan')!;
     await act(async()=>{await create.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences()});container.querySelector<HTMLButtonElement>('nav button:nth-child(3)')?.click();});
     const click=async(label:string)=>{const button=[...container.querySelectorAll('button')].find(item=>item.textContent?.includes(label));expect(button,label).toBeDefined();await act(async()=>{button?.click();await new Promise(resolve=>setTimeout(resolve,0));});};
-    await click('Approve this plan');
-    await click('Confirm sandbox reservation');
+    await click('Approve this evening');
+    await click('Book this evening');
     const reservedVersion=JSON.parse(localStorage.getItem('planonit.state.v5')??'{}').plan.version as number;
     await click('Reset plan');
     const dialog=container.querySelector('[role="alertdialog"]');
@@ -97,7 +97,7 @@ describe('shared browser workspace',()=>{
     const click=async(label:string)=>{const button=[...container.querySelectorAll('button')].find(item=>item.textContent?.includes(label));expect(button,label).toBeDefined();await act(async()=>{button?.click();await new Promise(resolve=>setTimeout(resolve,0));});};
     await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});
     await click('Create plan preview');
-    await click('Approve this plan');
+    await click('Approve this evening');
     const stored=JSON.parse(localStorage.getItem('planonit.state.v5')??'{}');
     const approvedVersion=stored.plan.version as number;
     // Simulate a tab that wrote the pending state and died before the authority answered.
@@ -114,7 +114,7 @@ describe('shared browser workspace',()=>{
     expect(Object.keys(reloaded.provider.reservations)).toHaveLength(0);
     // And the human can approve again rather than being stuck behind a frozen pending state.
     expect([...container.querySelectorAll('button')].map(item=>item.textContent??'').join(' ')).not.toContain('Confirming with the provider');
-    await click('Approve this plan');
+    await click('Approve this evening');
     expect(JSON.parse(localStorage.getItem('planonit.state.v5')??'{}').plan.status).toBe('approved');
   });
 

@@ -111,6 +111,10 @@ states plainly what it does *not* do — a reset never cancels a sandbox reserva
 Confirmed reservations stay in the provider ledger, and the new plan's version continues forward so it can never
 collide with a previous commitment.
 
+## Interface
+
+The plan screen is written for the person, not the system. An untouched workspace shows a calm empty state rather than a list of blocking failures; feasibility checks appear under everyday names ("Table available", "Timing works") with the stable technical IDs kept in the WebMCP payloads; the itinerary shows Film → Travel → Dinner with the waiting time explained rather than implied; and the header pill reports "Agent working…" only while a registered tool is genuinely executing. `src/labels.ts` is the single place that translates system vocabulary into a diner's.
+
 ## Inventory window
 
 The supported planning window is **rolling**: it opens two days after the current date and runs for fourteen days, so the demo cannot expire. The window is computed at validation time, advertised in the WebMCP `date` enums, and enforced identically by the provider, so a date the schema accepts is always a date the provider can serve. Tests pin the window origin (`setPlanningWindowOrigin`) so date-sensitive assertions stay deterministic; production follows the real clock.

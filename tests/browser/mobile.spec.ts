@@ -48,7 +48,9 @@ for(const viewport of MOBILE_VIEWPORTS){
       for(const target of await tapTargets(page,'nav[aria-label="Planning steps"] button'))
         expect(target.height,`nav "${target.label}" tap target`).toBeGreaterThanOrEqual(44);
       await navButtons.nth(2).click();
-      await expect(page.getByText('CURRENT PLAN')).toBeVisible();
+      // With nothing chosen the plan tab shows a calm empty state, not a wall of failures.
+      await expect(page.getByRole('heading',{name:'Nothing planned yet.'})).toBeVisible();
+      await expect(page.getByText('NEEDS A FIX')).toHaveCount(0);
       await navButtons.nth(0).focus();
       expect(await page.evaluate(()=>document.activeElement?.textContent?.trim())).toContain('Goal');
       await page.keyboard.press('Enter');
@@ -87,7 +89,7 @@ for(const viewport of MOBILE_VIEWPORTS){
       await page.getByRole('button',{name:'2. Explore'}).click();
       await page.locator('.choice-card').first().locator('.slot-row button').first().click();
       await page.getByRole('button',{name:'3. Plan'}).click();
-      const repair=page.getByRole('button',{name:/Repair plan now/});
+      const repair=page.getByRole('button',{name:/Fix this for me/});
       if(await repair.count()){
         await expect(repair).toBeVisible();
         await repair.click();
@@ -95,7 +97,7 @@ for(const viewport of MOBILE_VIEWPORTS){
       await noHorizontalOverflow(page,viewport.width);
 
       // approval is human-only and reachable on a phone
-      const approve=page.getByRole('button',{name:/Approve this plan/});
+      const approve=page.getByRole('button',{name:/Approve this evening/});
       await expect(approve).toBeEnabled();
       for(const target of await tapTargets(page,'.cost-card button'))
         expect(target.height,`action "${target.label}" tap target`).toBeGreaterThanOrEqual(40);
@@ -103,17 +105,17 @@ for(const viewport of MOBILE_VIEWPORTS){
       await expect(page.getByText('Approved · awaiting confirmation').first()).toBeVisible();
 
       // reservation and the explicit new-plan lifecycle
-      await page.getByRole('button',{name:/Confirm sandbox reservation/}).click();
+      await page.getByRole('button',{name:/Book this evening/}).click();
       await expect(page.getByText('Reserved · confirmed').first()).toBeVisible();
-      await expect(page.getByText('RESERVATION HISTORY')).toBeVisible();
-      const startNew=page.getByRole('button',{name:/Start a new plan/});
+      await expect(page.getByText('YOUR BOOKINGS',{exact:true})).toBeVisible();
+      const startNew=page.getByRole('button',{name:/Plan another evening/});
       await expect(startNew).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
       await startNew.click();
       await expect(page.getByRole('heading',{name:/This plan is reserved|Create a feasible first draft/})).toBeVisible();
       await page.getByRole('button',{name:'3. Plan'}).click();
-      await expect(page.getByText('RESERVATION HISTORY')).toBeVisible();
-      await expect(page.getByText(/Still committed · superseded/)).toBeVisible();
+      await expect(page.getByText('YOUR BOOKINGS',{exact:true})).toBeVisible();
+      await expect(page.getByText(/Still booked · from an earlier plan/)).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
     });
 
@@ -138,7 +140,7 @@ for(const viewport of MOBILE_VIEWPORTS){
       await installModelContext(page);
       await page.goto('/');
       await page.getByRole('button',{name:/Create plan preview/}).click();
-      await page.getByRole('button',{name:/Approve this plan/}).click();
+      await page.getByRole('button',{name:/Approve this evening/}).click();
       const approvedVersion=await page.evaluate(()=>{
         const state=JSON.parse(localStorage.getItem('planonit.state.v5')!);
         state.plan.status='reservation_pending';
@@ -154,8 +156,8 @@ for(const viewport of MOBILE_VIEWPORTS){
       expect(recovered.plan.version).toBe(approvedVersion);
       expect(Object.keys(recovered.provider.reservations)).toHaveLength(0);
       // The human can carry on: approve again and reserve for real.
-      await page.getByRole('button',{name:/Approve this plan/}).click();
-      await page.getByRole('button',{name:/Confirm sandbox reservation/}).click();
+      await page.getByRole('button',{name:/Approve this evening/}).click();
+      await page.getByRole('button',{name:/Book this evening/}).click();
       await expect(page.getByText('Reserved · confirmed').first()).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
     });
@@ -164,11 +166,11 @@ for(const viewport of MOBILE_VIEWPORTS){
       await installModelContext(page);
       await page.goto('/');
       await page.getByRole('button',{name:/Create plan preview/}).click();
-      await page.getByRole('button',{name:/Approve this plan/}).click();
-      await page.getByRole('button',{name:/Confirm sandbox reservation/}).click();
+      await page.getByRole('button',{name:/Approve this evening/}).click();
+      await page.getByRole('button',{name:/Book this evening/}).click();
       await expect(page.getByText('Reserved · confirmed').first()).toBeVisible();
-      await expect(page.getByRole('button',{name:/Repair plan now/})).toHaveCount(0);
-      await expect(page.getByRole('button',{name:/Edit choices/})).toHaveCount(0);
+      await expect(page.getByRole('button',{name:/Fix this for me/})).toHaveCount(0);
+      await expect(page.getByRole('button',{name:/Change my choices/})).toHaveCount(0);
       await page.getByRole('button',{name:'1. Goal'}).click();
       await expect(page.getByLabel('Budget')).toBeDisabled();
       await expect(page.getByLabel('Date')).toBeDisabled();
@@ -182,10 +184,16 @@ for(const viewport of MOBILE_VIEWPORTS){
       await expect(dialog).toContainText('reset does not cancel');
       await page.evaluate(()=>localStorage.setItem('unrelated.site.key','keep-me'));
       await dialog.getByRole('button',{name:/Reset PlanOnIt/}).click();
-      await expect(page.getByText('Draft · not started').first()).toBeVisible();
+      // Reset drops the person back at the start of the flow with an empty workspace.
+      await expect(page.getByRole('heading',{name:/Tell an agent what you want/})).toBeVisible();
+      await page.getByRole('button',{name:'3. Plan'}).click();
+      await expect(page.getByRole('heading',{name:'Nothing planned yet.'})).toBeVisible();
       expect(await page.evaluate(()=>localStorage.getItem('unrelated.site.key'))).toBe('keep-me');
       await page.reload();
-      await expect(page.getByText('Draft · not started').first()).toBeVisible();
+      await page.getByRole('button',{name:'3. Plan'}).click();
+      await expect(page.getByRole('heading',{name:'Nothing planned yet.'})).toBeVisible();
+      // the earlier booking is still on the record after a reset and a reload
+      await expect(page.getByText('YOUR BOOKINGS',{exact:true})).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
     });
   });

@@ -49,3 +49,31 @@
 .reset-confirm ul{margin:0 0 12px;padding-left:18px;font-size:12px;line-height:1.55;color:#6b4a46}
 .reset-actions{display:flex;gap:8px;flex-wrap:wrap}
 .reset-actions button{flex:1}
+
+/* ---- consumer pass: empty state, timeline connector, disclosures, footer ---- */
+.state-dot.idle{background:#b9c6cd}
+.strip-flag{font-size:12px;font-weight:700;color:#a3342c;background:#fdeceb;border-radius:999px;padding:4px 10px}
+.start-empty{display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;padding:34px 22px}
+.start-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.start-actions button{min-height:44px}
+.timeline-track{position:relative}
+.timeline-track .timeline-row{position:relative}
+.timeline-track .timeline-row:not(:last-child)::after{content:'';position:absolute;left:19px;top:38px;bottom:-14px;width:2px;background:linear-gradient(#dbe6ea,#eef4f7)}
+.timeline-wait{display:flex;gap:10px;align-items:flex-start;margin:2px 0 2px 44px;padding:9px 12px;border-left:2px dashed #cfdde3;background:#fbfdfe;border-radius:0 10px 10px 0;color:#4d6675;font-size:13px}
+.timeline-wait svg{width:15px;height:15px;flex:none;margin-top:1px;color:#7d939f}
+.timeline-wait strong{color:#173247}
+.checks-disclosure{margin-top:6px}
+.checks-disclosure>summary{cursor:pointer;font-size:13px;font-weight:700;color:#3d5a6c;padding:9px 2px;min-height:40px;display:flex;align-items:center}
+.checks-disclosure>summary:focus-visible{outline:2px solid #2f7fa8;outline-offset:2px;border-radius:6px}
+.checks-disclosure[open]>summary{margin-bottom:8px}
+.plan-footer{margin-top:26px;padding-top:18px;border-top:1px solid #e4edf0}
+.choice-action button{min-height:44px}
+@media(max-width:720px){
+  /* phone reading order: what happens, then what it costs, then the decision */
+  .plan-layout{display:flex;flex-direction:column}
+  .plan-main{order:1}
+  .cost-card{order:2}
+  .timeline-wait{margin-left:0}
+  .start-actions button{width:100%}
+}
+.strip-people{display:inline-flex;align-items:center;gap:5px}

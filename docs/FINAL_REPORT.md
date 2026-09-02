@@ -319,3 +319,29 @@ Three defects were found by probing the areas the earlier audits described but n
 | Unit + integration | `npx vitest run` | **197 passed / 197**, 14 files |
 | Real-browser mobile | `npx playwright test` | **21 passed / 21**, 3 viewports, production build |
 | Lint / TypeScript / build / audit | — | pass / pass / pass / 0 vulnerabilities |
+
+
+---
+
+## 17. Revision 8 — the consumer pass
+
+The logic was sound but the first screen made a working product look broken: an untouched plan rendered `PLAN NEEDS ATTENTION` above eight blocking failures, a `2/10 checks` badge, and a repair button, all for an evening the person had not started. That, plus system vocabulary on every row, was the gap between a correct system and a believable product.
+
+- **Empty state.** `PlanView` branches on whether anything has been chosen. Nothing chosen shows one calm panel — *"Start with the film"* — and hides the failure callout, the check grid and the cost breakdown entirely.
+- **Everyday language.** `src/labels.ts` maps each check ID to a diner's phrase ("Table available", "Timing works", "Your booking"). The domain and the WebMCP payloads keep their stable IDs untouched, so agents are unaffected.
+- **Failures first.** A broken plan lists only what is wrong; all ten checks stay one disclosure away. A valid plan says so in one line.
+- **The wait is explained.** The timeline now names the gap between arriving and being seated ("29 min to spare — you arrive around 9:01 PM and the table is held for 9:30 PM") and draws a connector down the three legs.
+- **Dates read as dates.** `Fri, 5 Sep` in prose; ISO stays in the schemas, the date input and every tool payload.
+- **Destructive actions separated.** Reset moved out of the cost card, away from Approve and Book, into a page footer.
+- **One control per restaurant card**, its label carrying the reason it is unavailable.
+- **Agent activity.** The header pill reads "Agent working…" while a registered tool is executing, driven by the real handler and nothing else.
+- **Accessibility.** Arrow-key navigation between steps, and a polite live region announcing readiness changes.
+- **A regression the empty state introduced, caught and fixed:** after *Plan another evening* the previous booking disappeared from view. The booking history is now its own component rendered on the empty state too, so a commitment can never be hidden by starting over.
+
+### Revision 8 verification
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npx vitest run` | **197 passed / 197**, 14 files |
+| Real-browser mobile | `npx playwright test` | **21 passed / 21**, 3 viewports, production build |
+| Lint / TypeScript / build / audit | — | pass / pass / pass / 0 vulnerabilities |
