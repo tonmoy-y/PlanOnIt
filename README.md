@@ -100,7 +100,7 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
-- `tests/` — 181 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/` — 187 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
 - `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
 
 ### Reset

@@ -292,7 +292,7 @@ The inventory window was two hard-coded dates (`2026-09-03` .. `2026-09-16`). Ev
 
 | Check | Command | Result |
 |---|---|---|
-| Unit + integration | `npx vitest run` | **181 passed / 181**, 12 files |
+| Unit + integration | `npx vitest run` | **187 passed / 187**, 13 files |
 | Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151, production build |
 | Lint | `npx eslint src tests --max-warnings 0` | pass |
 | TypeScript | `npx tsc -b` | pass |
