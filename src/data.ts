@@ -63,11 +63,20 @@ const route = (fromLocationId:string,toLocationId:string,distanceKm:number,durat
     {id:`${fromLocationId}--${toLocationId}--metro`,name:'Metro + short ride',kind:'metro',durationMinutes:duration+12,fare:Math.max(160,baseFare-180),description:'Best-value mixed transit route'},
   ]
 });
+/**
+ * Routes are stored for both directions.
+ *
+ * The evening travels cinema -> restaurant, so the leg the planner needs is the reverse of the
+ * dining-area -> cinema-area pair the fixtures describe. Distance, duration and fare are
+ * symmetric, but the route and option IDs must name the direction actually travelled, otherwise
+ * `estimate_transport` would reject the only journey this product makes.
+ */
+const bothDirections=(from:string,to:string,distanceKm:number,duration:number,baseFare:number):Route[]=>[route(from,to,distanceKm,duration,baseFare),route(to,from,distanceKm,duration,baseFare)];
 export const routes: Route[] = [
-  route('dhanmondi-27','bashundhara-city',6.2,25,360), route('dhanmondi-27','jamuna-future-park',12.8,38,520),
-  route('gulshan-2','bashundhara-city',8.4,32,430), route('gulshan-2','jamuna-future-park',4.6,18,280),
-  route('banani-11','bashundhara-city',7.1,28,390), route('banani-11','jamuna-future-park',5.8,22,320),
-  route('uttara-7','bashundhara-city',17.5,46,650), route('uttara-7','jamuna-future-park',12.1,35,500),
+  ...bothDirections('dhanmondi-27','bashundhara-city',6.2,25,360), ...bothDirections('dhanmondi-27','jamuna-future-park',12.8,38,520),
+  ...bothDirections('gulshan-2','bashundhara-city',8.4,32,430), ...bothDirections('gulshan-2','jamuna-future-park',4.6,18,280),
+  ...bothDirections('banani-11','bashundhara-city',7.1,28,390), ...bothDirections('banani-11','jamuna-future-park',5.8,22,320),
+  ...bothDirections('uttara-7','bashundhara-city',17.5,46,650), ...bothDirections('uttara-7','jamuna-future-park',12.1,35,500),
 ];
 
 export const defaultPreferences = (): Plan['preferences'] => ({ transport:'lowest_cost', priority:'balanced', timing:'relaxed', minRestaurantRating:4.2 });

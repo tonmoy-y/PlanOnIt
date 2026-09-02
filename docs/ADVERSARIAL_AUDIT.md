@@ -35,4 +35,4 @@ npm run build
 npm audit --omit=dev
 ```
 
-Current result (revision 5): **187 unit/integration tests pass (13 files)** and **21 real-browser Playwright tests pass** (7 scenarios x 3 mobile viewports, executed against the production build in Chromium 151). Lint, typecheck, production build and `npm audit` are clean, and the browser discovers and invokes **13** live imperative tools. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are still **not** claimed as verified.
+Current result (revision 5): **197 unit/integration tests pass (14 files)** and **21 real-browser Playwright tests pass** (7 scenarios x 3 mobile viewports, executed against the production build in Chromium 151). Lint, typecheck, production build and `npm audit` are clean, and the browser discovers and invokes **13** live imperative tools. A real two-tab race rejected one stale writer and both tabs converged. The external deployment URL and hosted provider state are still **not** claimed as verified.

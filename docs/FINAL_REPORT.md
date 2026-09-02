@@ -292,9 +292,30 @@ The inventory window was two hard-coded dates (`2026-09-03` .. `2026-09-16`). Ev
 
 | Check | Command | Result |
 |---|---|---|
-| Unit + integration | `npx vitest run` | **187 passed / 187**, 13 files |
+| Unit + integration | `npx vitest run` | **197 passed / 197**, 14 files |
 | Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151, production build |
 | Lint | `npx eslint src tests --max-warnings 0` | pass |
 | TypeScript | `npx tsc -b` | pass |
 | Production build | `npm run build` | pass |
 | Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities |
+
+
+---
+
+## 16. Revision 7 — logic defects behind the movie-first rework
+
+Three defects were found by probing the areas the earlier audits described but never exercised.
+
+**Travel ran in the wrong direction.** The evening travels cinema → restaurant, but routes were stored and looked up as restaurant → cinema. Distance, duration and fare are symmetric so feasibility was unaffected and no test caught it — but `estimate_transport(cinema → restaurant)`, the only journey this product makes and the one an agent following the timeline would ask about, returned `ROUTE_NOT_FOUND`, and every selected transport option ID named the reverse of the trip. Routes are now stored in both directions with direction-correct IDs, and the domain resolves the leg from the cinema to the restaurant.
+
+**The `priority` preference was collected and ignored.** `lowest_cost` and `highest_rated` produced exactly the same plan as `balanced`: the terms existed but were dominated by the baseline rating weights. They are now weighted to be decisive, and the regression asserts the property rather than a fixture ID — the cheapest plan never costs more than balanced, the highest-rated plan never rates lower, and cheapest costs strictly less than highest-rated.
+
+**Reset could discard a reservation that was still resolving.** `startNewPlan` refused while `reservation_pending`, but `resetWorkspace` did not: it wiped the workspace while the outcome was unknown. It now returns a structured `RESERVATION_IN_PROGRESS` failure, consistent with every other mutation path.
+
+### Revision 7 verification
+
+| Check | Command | Result |
+|---|---|---|
+| Unit + integration | `npx vitest run` | **197 passed / 197**, 14 files |
+| Real-browser mobile | `npx playwright test` | **21 passed / 21**, 3 viewports, production build |
+| Lint / TypeScript / build / audit | — | pass / pass / pass / 0 vulnerabilities |

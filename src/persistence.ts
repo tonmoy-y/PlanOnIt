@@ -1,5 +1,5 @@
 import { initialPlan } from './data';
-import { Activity, AppState, Plan, ProviderState } from './types';
+import { Activity, AppState, Plan, ProviderState, ToolResult } from './types';
 import { fail, ok, planSchema, providerStateSchema } from './validation';
 
 export const STORAGE_KEY='planonit.state.v5';
@@ -37,11 +37,21 @@ export function saveState(plan:Plan,activity:Activity[],provider?:ProviderState,
  * commitment made with the provider was cancelled. Versions keep moving forward so a new
  * plan can never collide with a ledger entry from before the reset.
  */
-export function resetWorkspace(currentPlan:Plan,provider?:ProviderState):AppState{
+/**
+ * Clears PlanOnIt's own persisted workspace and nothing else.
+ *
+ * A reservation that is still resolving is refused rather than discarded: its outcome is not
+ * yet known, so wiping the plan underneath it would either strand an in-flight commitment or
+ * let a late result land on a workspace that no longer expects it. Confirmed reservations are
+ * kept in the provider ledger — resetting the planning workspace never cancels a commitment.
+ */
+export function resetWorkspace(currentPlan:Plan,provider?:ProviderState):ToolResult<AppState>{
+  if(currentPlan.status==='reservation_pending')
+    return fail('RESERVATION_IN_PROGRESS','A reservation attempt is still resolving. Wait for it to settle before starting fresh.',undefined,true);
   const next:AppState={plan:{...initialPlan(),version:currentPlan.version+1,city:currentPlan.city,changeSummary:'Workspace reset to a fresh plan'},activity:[],provider};
   if(typeof localStorage!=='undefined'){for(const key of OWNED_STORAGE_KEYS)localStorage.removeItem(key);}
   saveState(next.plan,next.activity,next.provider);
-  return next;
+  return ok(next);
 }
 
 export interface StateToken {plan:Plan;}

@@ -79,7 +79,7 @@ export function reservationOwnership(plan:Plan,provider:InventoryProvider=demoPr
 export function evaluatePlan(plan:Plan,provider:InventoryProvider=demoProvider):PlanEvaluation{
   const selected=plan.selections;
   const restaurant=provider.getRestaurant(selected.restaurantId); const movie=provider.getMovie(selected.movieId); const showtime=provider.showtimeSnapshot(selected.showtimeId,plan); const cinema=provider.getCinema(showtime?.cinemaId);
-  const route=provider.getRoute(restaurant?.locationId,cinema?.locationId); const transport=provider.getTransportOption(route,selected.transportOptionId);
+  const route=provider.getRoute(cinema?.locationId,restaurant?.locationId); const transport=provider.getTransportOption(route,selected.transportOptionId);
   const checks:FeasibilityCheck[]=[];
   const outsideWindow=dateOutsideWindow(plan.date);
   checks.push(check('date_window','Planning date',!outsideWindow,outsideWindow?`${plan.date} is outside the supported window (${planningWindow().start} to ${planningWindow().end}). This evening has passed — start a new plan to choose a current date.`:`${plan.date} is inside the supported window.`));
@@ -121,20 +121,21 @@ export function evaluatePlan(plan:Plan,provider:InventoryProvider=demoProvider):
 export function snapshotPlan(plan:Plan,provider:InventoryProvider=demoProvider):PlanSnapshot{
   const restaurantSource=provider.getRestaurant(plan.selections.restaurantId);const restaurant=restaurantSource?{...restaurantSource,slots:provider.restaurantSlots(restaurantSource,plan.date,plan)}:null; const movie=provider.getMovie(plan.selections.movieId)??null;
   const showtime=provider.showtimeSnapshot(plan.selections.showtimeId,plan)??null; const cinema=provider.getCinema(showtime?.cinemaId)??null;
-  const route=provider.getRoute(restaurant?.locationId,cinema?.locationId)??null; const transport=provider.getTransportOption(route??undefined,plan.selections.transportOptionId)??null;
+  const route=provider.getRoute(cinema?.locationId,restaurant?.locationId)??null; const transport=provider.getTransportOption(route??undefined,plan.selections.transportOptionId)??null;
   return {plan,evaluation:evaluatePlan(plan,provider),restaurant,movie,showtime,cinema,route,transport};
 }
 
 function scorePlan(plan:Plan,evaluation:PlanEvaluation,provider:InventoryProvider){
-  const restaurant=provider.getRestaurant(plan.selections.restaurantId)!; const movie=provider.getMovie(plan.selections.movieId)!; const showtime=provider.getShowtime(plan.selections.showtimeId)!; const cinema=provider.getCinema(showtime.cinemaId)!; const transport=provider.getTransportOption(provider.getRoute(restaurant.locationId,cinema.locationId),plan.selections.transportOptionId)!;
+  const restaurant=provider.getRestaurant(plan.selections.restaurantId)!; const movie=provider.getMovie(plan.selections.movieId)!; const showtime=provider.getShowtime(plan.selections.showtimeId)!; const cinema=provider.getCinema(showtime.cinemaId)!; const transport=provider.getTransportOption(provider.getRoute(cinema.locationId,restaurant.locationId),plan.selections.transportOptionId)!;
   let score=restaurant.rating*18+movie.rating*7;
   if(plan.preferences.cuisine&&restaurant.cuisine.toLowerCase().includes(plan.preferences.cuisine.toLowerCase()))score+=45;
   if(plan.preferences.movieGenre&&movie.genre.toLowerCase().includes(plan.preferences.movieGenre.toLowerCase()))score+=35;
   if(plan.preferences.transport==='comfortable'&&transport.kind==='comfort')score+=25;
   if(plan.preferences.transport==='fastest')score-=transport.durationMinutes;
   if(plan.preferences.transport==='lowest_cost')score-=transport.fare/30;
-  if(plan.preferences.priority==='lowest_cost')score-=(evaluation.costs.total??0)/80;
-  if(plan.preferences.priority==='highest_rated')score+=restaurant.rating*12+movie.rating*4;
+  // Priority must be able to overturn the baseline rating ranking, otherwise it is collected and ignored.
+  if(plan.preferences.priority==='lowest_cost')score-=(evaluation.costs.total??0)/25;
+  if(plan.preferences.priority==='highest_rated')score+=restaurant.rating*30+movie.rating*10;
   const slack=evaluation.timeline?.slackMinutes??0;
   score-=plan.preferences.timing==='relaxed'?Math.abs(slack-30)*0.65:Math.abs(slack-10)*0.9;
   return score;
@@ -149,7 +150,7 @@ export function solvePlan(input:PlannerInput,baseVersion=0,fixed?:{restaurantId?
   for(const restaurant of candidateRestaurants.filter(item=>!fixed?.restaurantId||item.id===fixed.restaurantId)){
     for(const slot of provider.availableRestaurantSlots(restaurant,input.date,input.people).filter(item=>!fixed?.restaurantSlot||item.time===fixed.restaurantSlot)){
       for(const showtime of candidateShows.filter(item=>(!fixed?.movieId||item.movieId===fixed.movieId)&&(!fixed?.showtimeId||item.id===fixed.showtimeId))){
-        const cinema=provider.getCinema(showtime.cinemaId)!; const route=provider.getRoute(restaurant.locationId,cinema.locationId); if(!route)continue;
+        const cinema=provider.getCinema(showtime.cinemaId)!; const route=provider.getRoute(cinema.locationId,restaurant.locationId); if(!route)continue;
         for(const transport of route.options){
           considered++;
           const plan:Plan={id:'current-plan',version:baseVersion+1,city:input.city,date:input.date,people:input.people,budget:input.budget,preferences:input.preferences,dinnerDurationMinutes:input.dinnerDurationMinutes,bufferMinutes:input.bufferMinutes,selections:{restaurantId:restaurant.id,restaurantSlot:slot.time,movieId:showtime.movieId,showtimeId:showtime.id,transportOptionId:transport.id},status:'draft',updatedAt:newTimestamp(),changeSummary:'Generated a feasible evening from shared constraints'};
@@ -172,7 +173,7 @@ export function solvePlan(input:PlannerInput,baseVersion=0,fixed?:{restaurantId?
 export function rankedDinnerSlots(plan:Plan,restaurantId:string,provider:InventoryProvider=demoProvider){
   const restaurant=provider.getRestaurant(restaurantId);if(!restaurant)return [];
   const movie=provider.getMovie(plan.selections.movieId);const showtime=provider.getShowtime(plan.selections.showtimeId);
-  const cinema=provider.getCinema(showtime?.cinemaId);const route=provider.getRoute(restaurant.locationId,cinema?.locationId);
+  const cinema=provider.getCinema(showtime?.cinemaId);const route=provider.getRoute(cinema?.locationId,restaurant.locationId);
   const transport=provider.getTransportOption(route,plan.selections.transportOptionId)
     ??route?.options.slice().sort((a,b)=>a.durationMinutes-b.durationMinutes)[0];
   const readyAt=movie&&showtime&&transport?minutes(showtime.startTime)+movie.durationMinutes+transport.durationMinutes+plan.bufferMinutes:null;
@@ -200,7 +201,7 @@ export function applyPlanUpdate(plan:Plan,input:unknown,provider:InventoryProvid
   if(change.budget!==undefined)next.budget=change.budget; if(change.people!==undefined)next.people=change.people; if(change.preferences)next.preferences=change.preferences;
   if(change.restaurantId&&change.restaurantSlot){const restaurant=provider.getRestaurant(change.restaurantId);if(!restaurant)return fail('UNKNOWN_RESTAURANT','Restaurant ID was not found.','restaurantId',true);const slot=provider.availableRestaurantSlots(restaurant,next.date,next.people).find(item=>item.time===change.restaurantSlot);if(!slot)return fail('INVALID_RESTAURANT_SLOT','The selected slot is unavailable for this restaurant, date, and party size.','restaurantSlot',true);next.selections.restaurantId=restaurant.id;next.selections.restaurantSlot=slot.time;}
   if(change.movieId&&change.showtimeId){const movie=provider.getMovie(change.movieId);const showtime=provider.getShowtime(change.showtimeId);if(!movie)return fail('UNKNOWN_MOVIE','Movie ID was not found.','movieId',true);if(!showtime)return fail('UNKNOWN_SHOWTIME','Showtime ID was not found.','showtimeId',true);if(showtime.movieId!==movie.id)return fail('MOVIE_SHOWTIME_MISMATCH','Showtime does not belong to the selected movie.','showtimeId',true);if(showtime.date!==next.date)return fail('SHOWTIME_DATE_MISMATCH','Showtime does not match the plan date.','showtimeId',true);next.selections.movieId=movie.id;next.selections.showtimeId=showtime.id;}
-  const restaurant=provider.getRestaurant(next.selections.restaurantId);const showtime=provider.getShowtime(next.selections.showtimeId);const cinema=provider.getCinema(showtime?.cinemaId);const route=provider.getRoute(restaurant?.locationId,cinema?.locationId);
+  const restaurant=provider.getRestaurant(next.selections.restaurantId);const showtime=provider.getShowtime(next.selections.showtimeId);const cinema=provider.getCinema(showtime?.cinemaId);const route=provider.getRoute(cinema?.locationId,restaurant?.locationId);
   if(change.transportOptionId){if(!provider.getTransportOption(route,change.transportOptionId))return fail('INVALID_TRANSPORT_OPTION','Transport option does not belong to the selected venue route.','transportOptionId',true);next.selections.transportOptionId=change.transportOptionId;}
   else if(next.selections.transportOptionId&&!provider.getTransportOption(route,next.selections.transportOptionId)){delete next.selections.transportOptionId;clearedDependencies.push('transportOptionId');}
   const evaluation=evaluatePlan(next,provider);next.status=evaluation.valid?'valid':'draft';return ok({plan:next,evaluation,clearedDependencies,changed:true});

@@ -94,7 +94,9 @@ export default function App(){
   const approve=async()=>{const result=approvePlan(planRef.current,planRef.current.version,demoProvider);if(!result.ok){showError(result.error);return;}const saved=await commit(result.data.plan,`Human approved valid version ${result.data.plan.version}`,'human',`Bound to provider revision ${demoProvider.revision}`);if(!saved.ok){showError(saved.error);return;}announce('This exact plan and inventory revision are approved');};
   const resetWorkspaceState=async()=>{
     const current=planRef.current;const ledger=demoProvider.listReservations();
-    const next=resetWorkspace(current,demoProvider.exportState());
+    const result=resetWorkspace(current,demoProvider.exportState());
+    if(!result.ok){showError(result.error);return;}
+    const next=result.data;
     demoProvider.importState(next.provider);
     planRef.current=next.plan;activityRef.current=[];setPlanState(next.plan);setActivity([]);setProviderTick(demoProvider.revision);
     await compareAndSwapState({plan:next.plan},{plan:next.plan,activity:[],provider:demoProvider.exportState(),writerId:writerId.current});

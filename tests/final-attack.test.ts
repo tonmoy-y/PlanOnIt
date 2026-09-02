@@ -25,7 +25,7 @@ describe('final adversarial pass',()=>{
   const pr=new MutableDemoProvider();let plan=initialPlan();const tools=buildTools(()=>plan,p=>{plan=p;},pr);
   const bad=[['create_evening_plan',{...c('2026-02-30')}],['create_evening_plan',{...c(),people:2.5}],['create_evening_plan',{...c(),city:'Chattogram'}],
    ['create_evening_plan',{...c(),budget:-1}],['update_plan',{expectedVersion:1}],['update_plan',{expectedVersion:1,movieId:'x'}],
-   ['estimate_transport',{fromLocationId:'bashundhara-city',toLocationId:'dhanmondi-27'}],['find_showtimes',{city:'Dhaka',date:'2026-09-04',people:99}],
+   ['estimate_transport',{fromLocationId:'bashundhara-city',toLocationId:'jamuna-future-park'}],['find_showtimes',{city:'Dhaka',date:'2026-09-04',people:99}],
    ['get_current_plan',{extra:1}],['reserve_plan',{expectedVersion:1,confirmation:'yes'}]] as const;
   for(const [name,input] of bad) expect(resultErrorCode(await tools.find(t=>t.name===name)!.execute(input)),`${name} ${JSON.stringify(input)}`).toBeTruthy();
   expect(plan.version).toBe(1);
