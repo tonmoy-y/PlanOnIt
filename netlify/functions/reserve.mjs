@@ -5,8 +5,18 @@ import { getStore } from '@netlify/blobs';
  *
  * The browser may lie about capacity, forge an approval, or replay a confirmation.
  * This function is the only thing that can actually commit inventory: it re-reads the
- * canonical ledger, re-checks capacity, enforces the idempotency key, bumps the revision,
- * and returns the canonical provider state for every client to import.
+ * canonical ledger, re-checks capacity, enforces a content-bound idempotency key, bumps the
+ * revision, and returns the canonical provider state for every client to import.
+ *
+ * STATUS: NOT ENABLED IN PRODUCTION, DELIBERATELY.
+ * Two honest limitations block it, and neither is papered over:
+ *   1. Authentication. A public single-page client cannot hold a shared bearer secret without
+ *      publishing it in JavaScript. Until a real per-user session exists, enabling this would
+ *      be authentication theatre, so `VITE_PLANONIT_AUTHORITY_ENDPOINT` is left unset and the
+ *      verified in-browser authority remains the only active one.
+ *   2. Atomicity. `getStore().get()` followed by `set()` is a read-modify-write, not a
+ *      transaction. Two simultaneous commits can interleave. It is written to fail closed and
+ *      to be idempotent, but it is not claimed to be transactional anywhere in the docs.
  */
 const STORE='planonit-workspace';
 const LEDGER='provider-state';
@@ -23,16 +33,21 @@ export default async function handler(request){
 
   let body;
   try{body=await request.json();}catch{return json(400,{ok:false,error:{code:'INVALID_INPUT',message:'Body must be JSON.'}});}
-  const {planId,version,date,people,selections,idempotencyKey}=body??{};
+  const {planId,version,date,people,selections,fingerprint,idempotencyKey}=body??{};
   if(typeof planId!=='string'||!Number.isInteger(version)||version<1||typeof date!=='string'||!Number.isInteger(people)||people<1||people>12||!selections||typeof idempotencyKey!=='string')
     return json(400,{ok:false,error:{code:'INVALID_INPUT',message:'planId, version, date, people, selections and idempotencyKey are required.'}});
-  if(idempotencyKey!==`${planId}:v${version}`)
-    return json(400,{ok:false,error:{code:'IDEMPOTENCY_KEY_MISMATCH',message:'The idempotency key must identify the exact plan version.'}});
+  if(typeof fingerprint!=='string'||fingerprint.length<4||idempotencyKey!==fingerprint)
+    return json(400,{ok:false,error:{code:'IDEMPOTENCY_KEY_MISMATCH',message:'The idempotency key must be the content-bound reservation fingerprint.'}});
 
   const store=getStore(STORE);
   const state=(await store.get(LEDGER,{type:'json'}))??EMPTY;
 
-  const existing=state.reservations[idempotencyKey];
+  // Identity keys the ledger; the fingerprint decides whether a repeat is a replay or a
+  // different reservation wearing the same key.
+  const ledgerKey=`${planId}:v${version}`;
+  const existing=state.reservations[ledgerKey];
+  if(existing&&existing.fingerprint!==fingerprint)
+    return json(409,{ok:false,error:{code:'RESERVATION_INTENT_MISMATCH',message:'A reservation already exists for this plan version with different selections.'}});
   if(existing)return json(200,{ok:true,reservation:existing,idempotent:true,providerState:state});
 
   const tableKey=`${selections.restaurantId}|${date}|${selections.restaurantSlot}`;
@@ -46,7 +61,7 @@ export default async function handler(request){
 
   const reservation={
     id:`SBX-${planId.toUpperCase()}-V${version}`,planId,version,providerRevision:state.revision+1,
-    status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey,
+    status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey,fingerprint,
     inventory:[
       {kind:'restaurant',inventoryKey:tableKey,quantity:people,state:'committed'},
       {kind:'showtime',inventoryKey:seatKey,quantity:people,state:'committed'},
@@ -56,7 +71,7 @@ export default async function handler(request){
     revision:state.revision+1,
     restaurantCapacity:{...state.restaurantCapacity,[tableKey]:tableRemaining-people},
     showtimeSeats:{...state.showtimeSeats,[seatKey]:seatsRemaining-people},
-    reservations:{...state.reservations,[idempotencyKey]:reservation},
+    reservations:{...state.reservations,[ledgerKey]:reservation},
   };
   // Blobs writes are last-write-wins, so re-read and abort if the ledger moved under us.
   const current=(await store.get(LEDGER,{type:'json'}))??EMPTY;

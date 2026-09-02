@@ -16,7 +16,8 @@ export type InventoryState = 'available' | 'held_by_current_plan' | 'committed_t
 export interface RestaurantSlot { date: string; time: string; capacityRemaining: number; inventoryState?: InventoryState; committedQuantity?: number; }
 export interface Restaurant {
   id: string; name: string; cuisine: string; city: string; locationId: string; rating: number;
-  pricePerPerson: number; description: string; image: string; openingHours: string;
+  pricePerPerson: number; priceRangeMin: number; priceRangeMax: number;
+  description: string; image: string; openingHours: string; opensAt: string; closesAt: string;
   minParty: number; maxParty: number; slots: RestaurantSlot[];
 }
 export interface Cinema { id: string; name: string; city: string; locationId: string; }
@@ -33,7 +34,16 @@ export interface ReservationInventoryRecord { kind:'restaurant'|'showtime'; inve
 export interface Reservation {
   id: string; planId:string; version: number; providerRevision:number;
   status: 'pending'|'confirmed'|'failed'; reservedAt: string; idempotencyKey: string;
+  /** Content-bound hash of the complete reservation intent. Replay requires an exact match. */
+  fingerprint: string;
   inventory: ReservationInventoryRecord[]; failureCode?:string;
+}
+/** The complete, canonicalised description of what a reservation commits to. */
+export interface ReservationIntent {
+  planId:string; planVersion:number; date:string; people:number;
+  restaurantId:string|null; restaurantSlot:string|null; restaurantInventoryKey:string|null;
+  movieId:string|null; showtimeId:string|null; showtimeInventoryKey:string|null;
+  showtimeStartTime:string|null; transportOptionId:string|null;
 }
 export interface Plan {
   id: string; version: number; city: string; date: string; people: number; budget: number;
@@ -44,7 +54,8 @@ export interface Plan {
 
 export interface FeasibilityCheck { id: string; label: string; passed: boolean; blocking: boolean; message: string; }
 export interface CostBreakdown { restaurant: number | null; movie: number | null; transport: number | null; total: number | null; remainingBudget: number | null; }
-export interface Timeline { dinnerStart: string; dinnerEnd: string; departAt: string; arriveAt: string; movieStart: string; movieEnd: string; slackMinutes: number; }
+/** Chronological order of the evening: movie → travel → dinner. */
+export interface Timeline { movieStart: string; movieEnd: string; departAt: string; arriveAt: string; readyAt: string; dinnerStart: string; dinnerEnd: string; slackMinutes: number; }
 export interface PlanEvaluation { valid: boolean; providerRevision: number; checks: FeasibilityCheck[]; costs: CostBreakdown; timeline: Timeline | null; }
 export interface PlanSnapshot {
   plan: Plan; evaluation: PlanEvaluation; restaurant: Restaurant | null; movie: Movie | null;

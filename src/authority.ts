@@ -44,7 +44,9 @@ export class RemoteReservationAuthority implements ReservationAuthority {
       const response=await request(this.options.endpoint,{
         method:'POST',
         headers:{'content-type':'application/json',...(this.options.token?{authorization:`Bearer ${this.options.token}`}:{})},
-        body:JSON.stringify({planId:plan.id,version:plan.version,date:plan.date,people:plan.people,selections:plan.selections,idempotencyKey:`${plan.id}:v${plan.version}`}),
+        // The idempotency key is the content-bound fingerprint captured for this exact intent,
+        // so the server can never replay a commitment against different selections.
+        body:JSON.stringify({planId:plan.id,version:plan.version,date:plan.date,people:plan.people,selections:plan.selections,fingerprint:plan.reservation?.fingerprint,idempotencyKey:plan.reservation?.fingerprint??`${plan.id}:v${plan.version}`}),
         signal:controller?.signal,
       });
       const payload=await response.json().catch(()=>null) as {ok?:boolean;error?:{code?:string;message?:string};reservation?:Reservation;idempotent?:boolean;providerState?:unknown}|null;

@@ -1,10 +1,18 @@
 # PlanOnIt
 
-PlanOnIt is a human-controlled planning workspace where an external AI agent can coordinate dinner, a movie, and transport through WebMCP, repair conflicts, and leave final approval to the person using the page.
+PlanOnIt is a human-controlled planning workspace where an external AI agent can plan a real evening out — **a film, the journey across the city, and dinner afterwards** — through WebMCP, repair conflicts, and leave final approval to the person using the page.
 
 [Public repository](https://github.com/tonmoy-y/PlanOnIt)
 
 **Live deployment:** <https://planonit.netlify.app/> — served over HTTPS from Netlify, built from this repository on push. `netlify.toml` holds the build, publish, function and security-header settings.
+
+> ⚠️ **The deployed site is currently behind this working tree.** Netlify builds from the last
+> pushed commit on `main`. As of the revision-5 audit the working tree carries ~900 lines of
+> committed-but-unpushed and uncommitted work (movie → travel → dinner ordering, reservation
+> ownership/integrity checks, content-bound idempotency, the reset flow, and the abandoned-
+> reservation recovery). A live check on 2026-09-02 confirmed the deployed build still renders
+> the old dinner-first itinerary. **Commit and push before submitting**, or judges opening the
+> URL will evaluate an older product than the one described here.
 
 ## Run and verify
 
@@ -31,7 +39,7 @@ npm run preview
 1. Open the app in the supported ChatGPT built-in browser.
 2. Confirm the header shows `Agent-ready · 13 tools`.
 3. Copy the on-page request: “Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use PlanOnIt's site tools, show me feasibility evidence, and leave approval to me.”
-4. Review the resulting timeline, eight checks, provider revision, and scaled total.
+4. Review the resulting timeline (film → travel → dinner), nine checks, provider revision, and scaled total.
 5. Make a manual choice that breaks the plan, then ask the agent to use `repair_plan` while preserving that choice.
 6. Approve the repaired version in the UI. Approval is never available as a WebMCP tool.
 
@@ -53,16 +61,25 @@ All 13 handlers parse untrusted input with strict Zod schemas. Mutations require
 
 ## Feasibility and safety
 
-Every plan exposes eight blocking checks:
+Every plan exposes nine blocking checks:
 
 1. required selections;
 2. city consistency;
 3. exact table/date/party availability;
 4. movie/showtime/date/seat integrity;
-5. reservation ownership for the exact plan version;
+5. reservation ownership — the provider's committed inventory must match this plan's current selections;
 6. a route-specific transport option;
-7. dinner, travel, buffer, movie chronology, and maximum idle-time policy;
-8. the party-scaled total budget.
+7. chronology: film start + running time + travel + arrival buffer must land before the table, within the idle-time policy;
+8. the restaurant's operating window — dinner must start after opening and finish before closing;
+9. the party-scaled total budget.
+
+### The evening runs movie → travel → dinner
+
+The film is the anchor. Dinner is booked *after* the credits: the solver takes the showtime, adds the running
+time, the route-specific travel time and the arrival buffer, and only then looks for a table. Restaurant cards
+show an operating window and a typical per-person price band rather than raw provider capacity; the exact table
+time is a derived, dependent choice, which is also why `repair_plan` may move the booking while keeping the
+restaurant you asked for.
 
 ### Reserved-plan lifecycle
 
@@ -82,8 +99,17 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `netlify/functions/reserve.mjs` — optional server-authoritative reservation transaction.
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
-- `tests/` — 112 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, and the standalone entry.
-- `tests/browser/` — 12 Playwright tests that run the real production build in a real browser at three mobile viewports.
+- `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
+- `tests/` — 161 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
+
+### Reset
+
+**Reset plan** in the Plan sidebar clears PlanOnIt's own saved state and nothing else: it removes only this app's
+`planonit.state.*` keys, never cookies or another site's data. It asks for a deliberate confirmation first and
+states plainly what it does *not* do — a reset never cancels a sandbox reservation that was already committed.
+Confirmed reservations stay in the provider ledger, and the new plan's version continues forward so it can never
+collide with a previous commitment.
 
 ## Honest scope
 

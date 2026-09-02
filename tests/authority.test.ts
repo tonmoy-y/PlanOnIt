@@ -25,7 +25,7 @@ describe('reservation authority boundary',()=>{
   it('commits through the server and imports the authoritative provider state',async()=>{
     const provider=new MutableDemoProvider();const plan=approvedPlan(provider);
     const serverState:ProviderState={revision:41,restaurantCapacity:{'server|key':1},showtimeSeats:{'server-show':2},reservations:{}};
-    const reservation:Reservation={id:'SRV-1',planId:plan.id,version:plan.version,providerRevision:41,status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey:`${plan.id}:v${plan.version}`,inventory:[]};
+    const reservation:Reservation={id:'SRV-1',planId:plan.id,version:plan.version,providerRevision:41,status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey:'fp1_test',fingerprint:'fp1_test',inventory:[]};
     let sent:{url:string;body:unknown;auth:string|undefined}|undefined;
     const authority=new RemoteReservationAuthority({endpoint:'https://example.test/api/reserve',token:'secret',fetchImpl:(async(url,init)=>{
       sent={url:String(url),body:JSON.parse(String((init as RequestInit).body)),auth:new Headers((init as RequestInit).headers).get('authorization')??undefined};
@@ -36,7 +36,9 @@ describe('reservation authority boundary',()=>{
     if(!result.ok)return;
     expect(result.data.reservationId).toBe('SRV-1');
     expect(sent?.auth).toBe('Bearer secret');
-    expect(sent?.body).toMatchObject({planId:plan.id,version:plan.version,idempotencyKey:`${plan.id}:v${plan.version}`});
+    expect(sent?.body).toMatchObject({planId:plan.id,version:plan.version,date:plan.date,people:plan.people});
+    expect(String((sent?.body as {idempotencyKey?:string}).idempotencyKey)).toMatch(/^fp1_/);
+    expect((sent?.body as {fingerprint?:string}).fingerprint).toBe((sent?.body as {idempotencyKey?:string}).idempotencyKey);
     expect(provider.exportState()).toEqual(serverState);
     expect(provider.revision).toBe(41);
   });
@@ -65,7 +67,7 @@ describe('reservation authority boundary',()=>{
   });
   it('discards an authoritative provider state that fails schema validation',async()=>{
     const provider=new MutableDemoProvider();const plan=approvedPlan(provider);
-    const reservation:Reservation={id:'SRV-2',planId:plan.id,version:plan.version,providerRevision:1,status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey:`${plan.id}:v${plan.version}`,inventory:[]};
+    const reservation:Reservation={id:'SRV-2',planId:plan.id,version:plan.version,providerRevision:1,status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey:'fp1_test',fingerprint:'fp1_test',inventory:[]};
     const authority=new RemoteReservationAuthority({endpoint:'https://example.test/api/reserve',fetchImpl:(async()=>respond(201,{ok:true,reservation,providerState:{revision:-4,restaurantCapacity:'nope'}})) as typeof fetch});
     const result=await reservePlan(plan,plan.version,provider,undefined,authority);
     expect(result.ok).toBe(true);

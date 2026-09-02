@@ -11,13 +11,20 @@ export const locations: Location[] = [
 
 const slots = (times: string[], capacity = 8) => ['2026-09-04', '2026-09-05'].flatMap(date => times.map((time, index) => ({ date, time, capacityRemaining: Math.max(2, capacity - index) })));
 
+/**
+ * Dinner follows the movie, so every table window is a late-evening one and every
+ * restaurant publishes the operating window the UI shows instead of raw capacity.
+ * `pricePerPerson` stays the planning figure used by costs, budget, and ranking;
+ * `priceRangeMin`/`priceRangeMax` are the typical spend band shown on the card and
+ * always bracket that same figure (asserted in tests/integrity.test.ts).
+ */
 export const restaurants: Restaurant[] = [
-  { id:'bistro-17', name:'Bistro 17', cuisine:'Modern Bengali', city:'Dhaka', locationId:'dhanmondi-27', rating:4.8, pricePerPerson:850, description:'Seasonal Bengali plates in a quiet garden room.', image:'🍛', openingHours:'17:00–23:00', minParty:1, maxParty:8, slots:slots(['17:45','18:00','18:30'],9) },
-  { id:'saffron-table', name:'Saffron Table', cuisine:'Indian', city:'Dhaka', locationId:'gulshan-2', rating:4.7, pricePerPerson:1050, description:'Regional Indian cooking with a contemporary edge.', image:'🍽️', openingHours:'17:30–23:30', minParty:1, maxParty:10, slots:slots(['17:45','18:15','18:45'],10) },
-  { id:'smoke-house', name:'The Smoke House', cuisine:'Grill & Barbecue', city:'Dhaka', locationId:'banani-11', rating:4.6, pricePerPerson:1250, description:'Charcoal-grilled favourites in a lively late-night room.', image:'🔥', openingHours:'18:00–00:00', minParty:2, maxParty:8, slots:slots(['18:00','18:30','19:00'],7) },
-  { id:'riverstone', name:'Riverstone Kitchen', cuisine:'Asian Fusion', city:'Dhaka', locationId:'uttara-7', rating:4.5, pricePerPerson:700, description:'Bright, shareable plates for an easygoing evening.', image:'🌿', openingHours:'17:00–22:30', minParty:1, maxParty:12, slots:slots(['17:30','18:00','18:30'],12) },
-  { id:'pasta-fresco', name:'Pasta Fresco', cuisine:'Italian', city:'Dhaka', locationId:'dhanmondi-27', rating:4.6, pricePerPerson:900, description:'Handmade pasta and an intimate neighbourhood feel.', image:'🍝', openingHours:'17:30–23:00', minParty:1, maxParty:6, slots:slots(['17:45','18:15','18:45'],6) },
-  { id:'jade-lantern', name:'Jade Lantern', cuisine:'Chinese', city:'Dhaka', locationId:'gulshan-2', rating:4.4, pricePerPerson:780, description:'Cantonese comfort food designed for sharing.', image:'🥟', openingHours:'17:00–23:00', minParty:2, maxParty:10, slots:slots(['17:30','18:00','18:30'],8) },
+  { id:'bistro-17', name:'Bistro 17', cuisine:'Modern Bengali', city:'Dhaka', locationId:'dhanmondi-27', rating:4.8, pricePerPerson:850, priceRangeMin:700, priceRangeMax:1000, description:'Seasonal Bengali plates in a quiet garden room.', image:'🍛', openingHours:'17:00–23:00', opensAt:'17:00', closesAt:'23:00', minParty:1, maxParty:8, slots:slots(['19:30','20:00','20:30','21:00','21:30'],9) },
+  { id:'saffron-table', name:'Saffron Table', cuisine:'Indian', city:'Dhaka', locationId:'gulshan-2', rating:4.7, pricePerPerson:1050, priceRangeMin:900, priceRangeMax:1300, description:'Regional Indian cooking with a contemporary edge.', image:'🍽️', openingHours:'17:30–23:30', opensAt:'17:30', closesAt:'23:30', minParty:1, maxParty:10, slots:slots(['19:45','20:15','20:45','21:15','21:45'],10) },
+  { id:'smoke-house', name:'The Smoke House', cuisine:'Grill & Barbecue', city:'Dhaka', locationId:'banani-11', rating:4.6, pricePerPerson:1250, priceRangeMin:1050, priceRangeMax:1500, description:'Charcoal-grilled favourites in a lively late-night room.', image:'🔥', openingHours:'18:00–00:00', opensAt:'18:00', closesAt:'23:59', minParty:2, maxParty:8, slots:slots(['20:00','20:30','21:00','21:30','22:00','22:30'],7) },
+  { id:'riverstone', name:'Riverstone Kitchen', cuisine:'Asian Fusion', city:'Dhaka', locationId:'uttara-7', rating:4.5, pricePerPerson:700, priceRangeMin:600, priceRangeMax:850, description:'Bright, shareable plates for an easygoing evening.', image:'🌿', openingHours:'17:00–22:30', opensAt:'17:00', closesAt:'22:30', minParty:1, maxParty:12, slots:slots(['19:00','19:30','20:00','20:30','21:00'],12) },
+  { id:'pasta-fresco', name:'Pasta Fresco', cuisine:'Italian', city:'Dhaka', locationId:'dhanmondi-27', rating:4.6, pricePerPerson:900, priceRangeMin:750, priceRangeMax:1100, description:'Handmade pasta and an intimate neighbourhood feel.', image:'🍝', openingHours:'17:30–23:00', opensAt:'17:30', closesAt:'23:00', minParty:1, maxParty:6, slots:slots(['19:45','20:15','20:45','21:15'],6) },
+  { id:'jade-lantern', name:'Jade Lantern', cuisine:'Chinese', city:'Dhaka', locationId:'gulshan-2', rating:4.4, pricePerPerson:780, priceRangeMin:650, priceRangeMax:950, description:'Cantonese comfort food designed for sharing.', image:'🥟', openingHours:'17:00–23:00', opensAt:'17:00', closesAt:'23:00', minParty:2, maxParty:10, slots:slots(['19:30','20:00','20:30','21:00','21:30'],8) },
 ];
 
 export const cinemas: Cinema[] = [
@@ -32,14 +39,15 @@ export const movies: Movie[] = [
   { id:'monsoon-code', title:'Monsoon Code', genre:'Thriller', durationMinutes:119, rating:8.0, poster:'🌧️', description:'A data journalist follows a trail through a flooded city.' },
 ];
 
+/** The movie is the anchor of the evening, so showtimes are early-evening and dinner follows. */
 const showsFor = (date: string): Showtime[] => [
-  {id:`tls-${date}-2015`,movieId:'the-last-signal',cinemaId:'star-bashundhara',date,startTime:'20:15',price:550,capacity:120,seatsRemaining:42},
-  {id:`tls-${date}-2145`,movieId:'the-last-signal',cinemaId:'blockbuster-jamuna',date,startTime:'21:45',price:600,capacity:100,seatsRemaining:18},
-  {id:`pm-${date}-2000`,movieId:'paper-moons',cinemaId:'blockbuster-jamuna',date,startTime:'20:00',price:500,capacity:100,seatsRemaining:36},
-  {id:`pm-${date}-2200`,movieId:'paper-moons',cinemaId:'star-bashundhara',date,startTime:'22:00',price:550,capacity:120,seatsRemaining:8},
-  {id:`lt-${date}-2030`,movieId:'laugh-track',cinemaId:'star-bashundhara',date,startTime:'20:30',price:450,capacity:120,seatsRemaining:64},
-  {id:`lt-${date}-2115`,movieId:'laugh-track',cinemaId:'blockbuster-jamuna',date,startTime:'21:15',price:475,capacity:100,seatsRemaining:27},
-  {id:`mc-${date}-2045`,movieId:'monsoon-code',cinemaId:'blockbuster-jamuna',date,startTime:'20:45',price:525,capacity:100,seatsRemaining:31},
+  {id:`tls-${date}-1645`,movieId:'the-last-signal',cinemaId:'star-bashundhara',date,startTime:'16:45',price:550,capacity:120,seatsRemaining:42},
+  {id:`tls-${date}-1730`,movieId:'the-last-signal',cinemaId:'blockbuster-jamuna',date,startTime:'17:30',price:600,capacity:100,seatsRemaining:18},
+  {id:`pm-${date}-1700`,movieId:'paper-moons',cinemaId:'blockbuster-jamuna',date,startTime:'17:00',price:500,capacity:100,seatsRemaining:36},
+  {id:`pm-${date}-1815`,movieId:'paper-moons',cinemaId:'star-bashundhara',date,startTime:'18:15',price:550,capacity:120,seatsRemaining:8},
+  {id:`lt-${date}-1715`,movieId:'laugh-track',cinemaId:'star-bashundhara',date,startTime:'17:15',price:450,capacity:120,seatsRemaining:64},
+  {id:`lt-${date}-1845`,movieId:'laugh-track',cinemaId:'blockbuster-jamuna',date,startTime:'18:45',price:475,capacity:100,seatsRemaining:27},
+  {id:`mc-${date}-1745`,movieId:'monsoon-code',cinemaId:'blockbuster-jamuna',date,startTime:'17:45',price:525,capacity:100,seatsRemaining:31},
 ];
 export const showtimes: Showtime[] = [...showsFor('2026-09-04'), ...showsFor('2026-09-05')];
 

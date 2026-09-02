@@ -1,4 +1,5 @@
 import { cinemas, locations, movies, restaurants, routes, showtimes } from './data';
+import { reservationFingerprint, reservationLedgerKey } from './intent';
 import { InventoryState, Plan, ProviderState, Reservation, Restaurant, RestaurantSlot, Route, Showtime, ToolResult } from './types';
 import { fail, ok, PLANNING_WINDOW } from './validation';
 
@@ -57,7 +58,7 @@ export class MutableDemoProvider implements InventoryProvider {
     return date?this.generatedShowtimes(date).find(item=>item.id===id):undefined;
   }
 
-  getReservation(plan:Pick<Plan,'id'|'version'>){return this.state.reservations[`${plan.id}:v${plan.version}`];}
+  getReservation(plan:Pick<Plan,'id'|'version'>){return this.state.reservations[reservationLedgerKey(plan)];}
   listReservations(){return Object.values(this.state.reservations).map(item=>clone(item)).sort((a,b)=>b.version-a.version);}
   showtimeSnapshot(id?:string,plan?:Plan){
     const showtime=this.getShowtime(id);if(!showtime)return undefined;
@@ -99,18 +100,24 @@ export class MutableDemoProvider implements InventoryProvider {
   }
 
   reserve(plan:Plan):ToolResult<{reservation:Reservation;idempotent:boolean}>{
-    const idempotencyKey=`${plan.id}:v${plan.version}`;
-    const existing=this.state.reservations[idempotencyKey];
-    if(existing)return ok({reservation:clone(existing),idempotent:true});
+    // The ledger key is plan identity; replay additionally requires an identical content
+    // fingerprint, so a forged or replayed plan that reuses the key but changes the
+    // restaurant, movie, showtime, date, party size, or inventory key can never replay.
+    const ledgerKey=reservationLedgerKey(plan);const fingerprint=reservationFingerprint(plan,this);
+    const existing=this.state.reservations[ledgerKey];
+    if(existing){
+      if(existing.fingerprint!==fingerprint)return fail('RESERVATION_INTENT_MISMATCH',`Reservation ${existing.id} was committed for different selections. A changed plan must be a new version, not a replay.`,undefined,false);
+      return ok({reservation:clone(existing),idempotent:true});
+    }
     if(this.failNextReservation){this.failNextReservation=false;return fail('PROVIDER_UNAVAILABLE','The sandbox provider failed before inventory was changed.',undefined,true);}
     const restaurant=this.getRestaurant(plan.selections.restaurantId);const showtime=this.getShowtime(plan.selections.showtimeId);
     const slot=restaurant&&this.availableRestaurantSlots(restaurant,plan.date,plan.people).find(item=>item.time===plan.selections.restaurantSlot);
     if(!restaurant||!slot||!showtime||showtime.seatsRemaining<plan.people)return fail('PROVIDER_CONFLICT','Provider inventory changed. Refresh and repair the plan before approving again.',undefined,true);
     const reservedAt=new Date().toISOString();const tableKey=restaurantKey(restaurant.id,plan.date,slot.time);
-    const reservation:Reservation={id:`SBX-${plan.id.toUpperCase()}-V${plan.version}`,planId:plan.id,version:plan.version,providerRevision:this.state.revision+1,status:'confirmed',reservedAt,idempotencyKey,inventory:[{kind:'restaurant',inventoryKey:tableKey,quantity:plan.people,state:'committed'},{kind:'showtime',inventoryKey:showtime.id,quantity:plan.people,state:'committed'}]};
+    const reservation:Reservation={id:`SBX-${plan.id.toUpperCase()}-V${plan.version}`,planId:plan.id,version:plan.version,providerRevision:this.state.revision+1,status:'confirmed',reservedAt,idempotencyKey:fingerprint,fingerprint,inventory:[{kind:'restaurant',inventoryKey:tableKey,quantity:plan.people,state:'committed'},{kind:'showtime',inventoryKey:showtime.id,quantity:plan.people,state:'committed'}]};
     this.state.restaurantCapacity[tableKey]=slot.capacityRemaining-plan.people;
     this.state.showtimeSeats[showtime.id]=showtime.seatsRemaining-plan.people;
-    this.state.reservations[idempotencyKey]=reservation;this.state.revision++;
+    this.state.reservations[ledgerKey]=reservation;this.state.revision++;
     return ok({reservation:clone(reservation),idempotent:false});
   }
 

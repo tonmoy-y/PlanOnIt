@@ -2,15 +2,15 @@
 
 ## 0:00–0:35 — One clear promise
 
-Show the Goal screen: “Tell an agent what you want. Keep the final say.” Point to the shared version strip and the `Agent-ready · 12 tools` state. Copy the canonical request.
+Show the Goal screen: “Tell an agent what you want. Keep the final say.” Point to the shared version strip and the `Agent-ready · 13 tools` state. Copy the canonical request.
 
 ## 0:35–1:15 — Agent creates evidence
 
-Let the external agent call `create_evening_plan`, then `validate_plan`. Open **Plan** and show the exact dinner slot/capacity, atomic movie/showtime/cinema, route-specific transport, computed chronology, eight checks, scaled total, plan version, and provider revision.
+Let the external agent call `create_evening_plan`, then `validate_plan`. Open **Plan** and show the film and showtime, the route-specific journey to dinner, the table booked after the credits, computed chronology, nine checks, scaled total, plan version, and provider revision.
 
 ## 1:15–2:10 — Human breaks, agent repairs
 
-In **Explore**, make a dinner choice that clears or invalidates a dependency. Return to Plan and show the prominent failed-check callout. Ask the agent to repair the current version while preserving dinner. Highlight that it either returns a fully evidenced plan or an honest structured failure; it never invents availability.
+In **Explore**, make a choice that clears or invalidates a dependency. Return to Plan and show the prominent failed-check callout. Ask the agent to repair the current version while preserving dinner. Highlight that it either returns a fully evidenced plan or an honest structured failure; it never invents availability.
 
 Send one mutation with the old version and show `STALE_PLAN_VERSION`.
 

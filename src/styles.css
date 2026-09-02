@@ -17,3 +17,35 @@
 .reservation-tag.confirmed{background:#e4f4ec;color:#1f6c47}
 .reservation-tag.failed{background:#fdeceb;color:#a3342c}
 .reservation-tag.pending{background:#fdf4e3;color:#8a6316}
+
+/* Accessibility pass: no meaningful text below 11px, and every control keeps a 44px target. */
+.eyebrow,.status-chip,.webmcp-pill,.rating,.score-badge,.section-title>span{font-size:11px}
+.choice-meta,.route-summary span,.transport-grid span,.budget-row,.breakdown small,.activity-row div span,.live-dot,.status-line,.section-heading>span,.reservation-confirmed strong,.technical-details,.plan-technical,.how-card>div>span{font-size:11px}
+.breakdown small{font-size:11px}
+.prompt-box code{font-size:11px;line-height:1.7}
+.fine-print,.field-error,.unavailable{font-size:12px}
+.slot-row button,.transport-grid button,.choice-action button,.reset-actions button{min-height:44px}
+
+/* Restaurant cards: operating window and typical spend instead of raw provider capacity. */
+.price-band{font-weight:700;color:#2c4a58}
+.choice-meta span{display:flex;align-items:center;gap:6px}
+.choice-meta svg{width:13px}
+.choice-action{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px}
+.choice-action .chosen-slot{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#276b5a}
+.choice-action .chosen-slot svg{width:14px}
+.choice-action .suggested-slot{font-size:12px;color:#55717e}
+.choice-action button{flex:none}
+
+/* Lifecycle lock affordances. */
+.locked-banner{display:flex;align-items:center;gap:10px;background:#eef4f7;border:1px solid #cfdde4;border-radius:11px;padding:13px 15px;margin-bottom:18px;font-size:12px;color:#33556a}
+.locked-banner svg,.locked-note svg{width:16px;flex:none}
+.locked-note{display:flex;align-items:center;gap:8px;grid-column:1/-1;margin:0 0 4px;font-size:12px;color:#33556a;background:#eef4f7;border:1px solid #cfdde4;border-radius:9px;padding:10px 12px}
+.constraint-editor.locked input,.constraint-editor.locked select{background:#f1f4f5;color:#6b7d88}
+
+/* PlanOnIt-only reset. */
+.text-button.danger{color:#8d302c}
+.reset-confirm{border:1px solid #e6cdc8;background:#fdf5f3;border-radius:11px;padding:14px;margin-top:10px}
+.reset-confirm strong{display:block;font-size:13px;color:#7a3630;margin-bottom:8px}
+.reset-confirm ul{margin:0 0 12px;padding-left:18px;font-size:12px;line-height:1.55;color:#6b4a46}
+.reset-actions{display:flex;gap:8px;flex-wrap:wrap}
+.reset-actions button{flex:1}

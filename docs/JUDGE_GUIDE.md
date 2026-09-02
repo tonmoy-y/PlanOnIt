@@ -5,7 +5,7 @@
 1. Run `npm install && npm run dev` and open the URL in the supported ChatGPT built-in browser.
 2. Confirm `Agent-ready · 13 tools` and copy the on-page agent request.
 3. Have the external agent create a plan. Open **3. Plan** and inspect the exact table slot, movie/showtime, route, chronology, scaled cost, eight checks, plan version, and provider revision.
-4. Open **2. Explore**, change the dinner choice, and return to Plan. If the route or chronology breaks, the repair callout must name each failed check.
+4. Open **2. Explore**, change the film or the restaurant, and return to Plan. If the route or chronology breaks, the repair callout must name each failed check.
 5. Ask the agent: “Repair PlanOnIt plan vN. Preserve the restaurant if possible, explain every changed dependency, and validate the result.”
 6. Try a mutation with the previous version; expect `STALE_PLAN_VERSION`.
 7. Approve the valid current version in the UI. Edit the budget and confirm the approval disappears on the new version.
@@ -30,4 +30,4 @@ Approve and confirm a reservation, then ask the agent to call `create_evening_pl
 
 The local solver is labeled **Create plan preview** and never masquerades as an agent. The root `index.html` is an inlined standalone entry. At 375, 390, and 412 px the header navigation is in normal document flow—there is no fixed bottom bar for a deployment badge to cover.
 
-Run `npm run lint && npm run typecheck && npm test && npm run build` before judging. `npm run test:browser` runs the Playwright suite at 375×812, 390×844 and 412×915 against the production build.
+Run `npm run lint && npm run typecheck && npm test && npm run build` before judging. `npm run test:browser` runs the 21-test Playwright suite at 375×812, 390×844 and 412×915 against the production build (needs a local Chromium with system deps).

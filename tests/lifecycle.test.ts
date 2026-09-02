@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { approvePlan, hasActiveReservation, reservePlan, solvePlan, startNewPlan } from '../src/domain';
+import { applyPlanUpdate, approvePlan, evaluatePlan, hasActiveReservation, reconcileAbandonedReservation, repairPlan, reservePlan, solvePlan, startNewPlan } from '../src/domain';
+import { reservationFingerprint } from '../src/intent';
 import { defaultPreferences, initialPlan } from '../src/data';
 import { demoProvider, MutableDemoProvider } from '../src/providers';
 import { buildTools, resultErrorCode, toolNames } from '../src/tools';
@@ -180,5 +181,98 @@ describe('advertised schema matches runtime for every tool',()=>{
     expect(tool.annotations.readOnlyHint).toBe(false);
     expect(tool.description).toContain('never cancelled');
     expect((tool.inputSchema as {required:string[]}).required).toEqual(['expectedVersion']);
+  });
+});
+
+/**
+ * BUG-3 — a `reservation_pending` plan persisted by a tab that died mid-commit is correctly
+ * immutable, which used to make it a permanent dead end: update, repair, approve, reserve,
+ * and start_new_plan all refuse it and only a destructive reset escaped. Recovery must
+ * resolve it honestly without consuming inventory or losing a real commitment.
+ */
+describe('BUG-3 — an abandoned in-flight reservation is recoverable', () => {
+  const pendingPlan=(plan:Plan,provider:MutableDemoProvider):Plan=>({...plan,status:'reservation_pending',reservation:{id:`PENDING-${plan.id.toUpperCase()}-V${plan.version}`,planId:plan.id,version:plan.version,providerRevision:provider.revision,status:'pending',reservedAt:new Date().toISOString(),idempotencyKey:reservationFingerprint(plan,provider),fingerprint:reservationFingerprint(plan,provider),inventory:[{kind:'restaurant',inventoryKey:`${plan.selections.restaurantId}|${plan.date}|${plan.selections.restaurantSlot}`,quantity:plan.people,state:'held'}]}});
+
+  async function approvedPlan(provider:MutableDemoProvider){
+    const solved=solvePlan(constraints,0,undefined,provider);if(!solved.ok)throw new Error('no plan');
+    const approved=approvePlan(solved.plan,solved.plan.version,provider);if(!approved.ok)throw new Error('no approval');
+    return approved.data.plan;
+  }
+
+  it('reproduces the dead end: every path refuses a persisted pending plan', async () => {
+    const provider=new MutableDemoProvider();
+    const stuck=pendingPlan(await approvedPlan(provider),provider);
+    expect(startNewPlan(stuck,stuck.version,provider)).toMatchObject({ok:false,error:{code:'RESERVATION_IN_PROGRESS'}});
+    expect(applyPlanUpdate(stuck,{expectedVersion:stuck.version,budget:12000},provider)).toMatchObject({ok:false,error:{code:'RESERVATION_IN_PROGRESS'}});
+    expect(repairPlan(stuck,{expectedVersion:stuck.version,preserveRestaurant:true,preserveMovie:false},provider)).toMatchObject({ok:false,error:{code:'RESERVATION_IN_PROGRESS'}});
+    expect(approvePlan(stuck,stuck.version,provider)).toMatchObject({ok:false,error:{code:'RESERVATION_IN_PROGRESS'}});
+    expect(await reservePlan(stuck,stuck.version,provider,undefined,undefined,()=>stuck)).toMatchObject({ok:false,error:{code:'RESERVATION_IN_PROGRESS'}});
+  });
+
+  it('releases an abandoned attempt that never reached the provider, without consuming inventory', async () => {
+    const provider=new MutableDemoProvider();
+    const stuck=pendingPlan(await approvedPlan(provider),provider);
+    const revisionBefore=provider.revision;
+    const {plan:recovered,resolved}=reconcileAbandonedReservation(stuck,provider);
+    expect(resolved).toBe('failed');
+    expect(recovered.status).toBe('reservation_failed');
+    expect(recovered.version).toBe(stuck.version);
+    expect(recovered.approval).toBeUndefined();
+    expect(recovered.reservation?.failureCode).toBe('RESERVATION_ABANDONED');
+    expect(recovered.reservation?.inventory.every(item=>item.state==='released')).toBe(true);
+    expect(provider.revision).toBe(revisionBefore);
+    expect(provider.listReservations()).toHaveLength(0);
+    // The workspace is usable again: approving and reserving still works from here.
+    const reapproved=approvePlan(recovered,recovered.version,provider);
+    expect(reapproved).toMatchObject({ok:true});
+    if(!reapproved.ok)throw new Error('unreachable');
+    expect(await reservePlan(reapproved.data.plan,reapproved.data.plan.version,provider)).toMatchObject({ok:true});
+  });
+
+  it('promotes to reserved when the ledger really did commit the same intent', async () => {
+    const provider=new MutableDemoProvider();
+    const plan=await approvedPlan(provider);
+    const committed=provider.reserve(plan);
+    expect(committed).toMatchObject({ok:true});
+    // The commit landed but the tab died before writing the plan back.
+    const stuck=pendingPlan(plan,provider);
+    const {plan:recovered,resolved}=reconcileAbandonedReservation(stuck,provider);
+    expect(resolved).toBe('reserved');
+    expect(recovered.status).toBe('reserved');
+    expect(recovered.version).toBe(plan.version);
+    expect(recovered.reservation?.status).toBe('confirmed');
+    expect(hasActiveReservation(recovered)).toBe(true);
+    // Recovery must survive the ownership check, not merely set a label.
+    expect(evaluatePlan(recovered,provider).checks.find(item=>item.id==='reservation_integrity')?.passed).toBe(true);
+    expect(provider.listReservations()).toHaveLength(1);
+  });
+
+  it('refuses to adopt a ledger entry committed for a different intent', async () => {
+    const provider=new MutableDemoProvider();
+    const plan=await approvedPlan(provider);
+    expect(provider.reserve(plan)).toMatchObject({ok:true});
+    // Same plan id and version, different party size: the ledger entry is not this intent.
+    const forged=pendingPlan({...plan,people:plan.people+1},provider);
+    const {plan:recovered,resolved}=reconcileAbandonedReservation(forged,provider);
+    expect(resolved).toBe('failed');
+    expect(recovered.status).toBe('reservation_failed');
+  });
+
+  it('leaves every other status untouched', async () => {
+    const provider=new MutableDemoProvider();
+    const plan=await approvedPlan(provider);
+    for(const status of ['draft','valid','approved','reservation_failed','reserved'] as const){
+      const candidate={...plan,status};
+      expect(reconcileAbandonedReservation(candidate,provider)).toEqual({plan:candidate,resolved:'none'});
+    }
+  });
+
+  it('is idempotent when repeated', async () => {
+    const provider=new MutableDemoProvider();
+    const stuck=pendingPlan(await approvedPlan(provider),provider);
+    const first=reconcileAbandonedReservation(stuck,provider);
+    const second=reconcileAbandonedReservation(first.plan,provider);
+    expect(second.resolved).toBe('none');
+    expect(second.plan).toEqual(first.plan);
   });
 });

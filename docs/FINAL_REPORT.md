@@ -28,7 +28,7 @@ Approval is bound to the exact positive plan version and provider revision. Rese
 
 ## 7. Testing
 
-- 81 tests across 6 files pass.
+- 81 tests across 6 files passed **at that revision** (see Revision 4 for current counts).
 - Lint and TypeScript checks pass.
 - Tests cover exact-capacity ownership, post-reservation validity, stale/repeated/failed/successful reservation, provider conflict and revision, no-op updates, date and timing boundaries, schema alignment, simultaneous compare-and-swap, repair, approval, keyboard navigation, and error association.
 - Real browser verification covered live WebMCP discovery/invocation, tool-to-UI mutation, human approval, successful reservation, post-reservation validity, two-tab conflict recovery, and zero console errors.
@@ -55,7 +55,7 @@ Then repeat the live WebMCP and mobile checks against the returned HTTPS URL.
 | Execution | 9.4/10 | P0 fixed, 81 tests, production/standalone builds, real browser/mobile/two-tab verification; hosted state and deployment remain absent. |
 | Potential Impact | 9.0/10 | The transparent human-agent coordination pattern generalizes well, but the sandbox remains one city and one browser origin. |
 | Creativity & Ambition | 9.3/10 | Ownership-aware commitments, repair under change, explicit feasibility receipts, and safe human approval create a credible agent-native workflow. |
-| **Total** | **37.4/40** | Strong local submission; the missing trusted hosted boundary and verified live deployment prevent an honest 39+. |
+| **Total** | **37.4/40** *(historical — revision 2)* | Strong local submission; the missing trusted hosted boundary and verified live deployment prevent an honest 39+. |
 
 ## 10. Remaining Weaknesses
 
@@ -89,7 +89,7 @@ Fixed on every path. `create_evening_plan` now returns `WORKSPACE_HAS_ACTIVE_RES
 
 ### 12.4 Verified mobile and accessibility behavior
 
-`tests/browser/mobile.spec.ts` runs the real production build in Chromium at 375×812, 390×844 and 412×915 (`npm run test:browser`). Each viewport asserts: all 13 tools register through a real `document.modelContext`, no element extends past the viewport, no console errors, ≥44px navigation tap targets, ≥12px secondary text, `role="alert"` / `aria-invalid` / `aria-describedby` on field errors, keyboard focus and activation, and the complete plan → repair → approve → reserve → start-new-plan workflow. 12/12 pass.
+`tests/browser/mobile.spec.ts` runs the real production build in Chromium at 375×812, 390×844 and 412×915 (`npm run test:browser`). Each viewport asserts: all 13 tools register through a real `document.modelContext`, no element extends past the viewport, no console errors, ≥44px navigation tap targets, ≥12px secondary text, `role="alert"` / `aria-invalid` / `aria-describedby` on field errors, keyboard focus and activation, and the complete plan → repair → approve → reserve → start-new-plan workflow. 12/12 passed at that revision.
 
 ### 12.5 Readability
 
@@ -104,7 +104,7 @@ Every 8–11px label was raised to a 12px floor (22 declarations), navigation an
 | Check | Result |
 |---|---|
 | Unit/integration tests | **112 passed**, 9 files |
-| Browser tests | **12 passed** at 375×812, 390×844, 412×915 |
+| Browser tests | **12 passed** at 375×812, 390×844, 412×915 *(revision 3 figure)* |
 | Lint | pass (`--max-warnings 0`) |
 | TypeScript | pass |
 | Production build | pass, standalone root entry regenerated |
@@ -123,3 +123,130 @@ Deployed and reachable over HTTPS at <https://planonit.netlify.app/>, built from
 - The supported window is the fixed range 2026-09-03 – 2026-09-16. After that date the app has no plannable inventory.
 - Reservations can be superseded but not cancelled; released inventory is not returned to the ledger.
 - `repair_plan` re-solves rather than computing a minimal diff, and the UI's repair summary is descriptive rather than a computed change list.
+
+
+---
+
+## 13. Revision 4 — hardening after the 34.5/40 audit
+
+Every score above this line is **historical**. This section is the current state of the repository.
+
+### Defects fixed
+
+**BUG-1 — `reservation_pending` was not fully protected, and an in-flight reservation could
+overwrite a newer plan.** There is now a single authoritative lifecycle predicate,
+`isPlanImmutable(plan)` in `src/domain.ts`, and every mutation path asks it instead of
+re-deriving the rule: `applyPlanUpdate`, `repairPlan`, `approvePlan`, `startNewPlan`,
+`reservePlan`, the five mutating WebMCP tools, and the human UI (which also disables the
+controls rather than offering edits that must fail). The async race is closed by capturing
+the complete reservation intent *before* the awaited authority call and re-reading the live
+workspace after it: `reservePlan` accepts a `readCurrentPlan` callback and refuses to write
+its result if the plan identity, version, status, date, party size, or selections moved,
+returning `RESERVATION_STATE_CHANGED` instead. No older result can overwrite a newer plan and
+no version can regress.
+
+**BUG-2 — idempotency was content-blind.** `planId:version` is no longer the idempotency key.
+`src/intent.ts` canonicalises the full reservation intent (plan id, version, date, people,
+restaurant, slot, restaurant inventory key, movie, showtime, showtime inventory key, showtime
+start time, transport option), hashes it, and that fingerprint is the idempotency key on the
+plan, in the provider ledger, and in the request body sent to the remote authority. An
+identical intent replays; a different restaurant, slot, movie, showtime, date, party size,
+transport option, or inventory key is rejected with `RESERVATION_INTENT_MISMATCH`.
+
+**Ownership/integrity.** `reservationOwnership()` compares the reservation on the plan, the
+reservation in the provider ledger, and the actually committed inventory keys and quantities
+against the plan's current selections. "Reserved · confirmed" can no longer be shown for
+inventory that does not belong to the current plan.
+
+**BUG-3 / BUG-4 — stale documentation and duplicated toast text.** Counts and claims in this
+repository now match the code; the human toast prints one sentence and only appends a detail
+line when it differs from the message.
+
+### Product changes
+
+- The evening now runs **movie → travel → dinner**, which is how the outing actually happens.
+  Chronology, the solver, the demo showtimes and table windows, and the itinerary were all
+  rebuilt around it, and a new `restaurant_hours` check keeps dinner inside the operating window.
+- Restaurant cards show an operating window (`Open 17:00–23:00`) and a typical spend band
+  (`৳700–৳1,000 / person`, always bracketing the price used for costing) instead of raw
+  capacity counts and slot buttons. The table time is derived from the film.
+- **Reset plan** clears only PlanOnIt's own storage keys, behind an explicit confirmation that
+  states what it does and does not cancel. Confirmed reservations stay in the ledger.
+- Reserved and pending plans disable their inputs and drop dead-end actions.
+- Accessibility: no meaningful text below 11px, 44px targets on every added control.
+
+### Verification actually run (Linux sandbox, revision 5)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Unit + integration | `npx vitest run` | **161 passed / 161**, 10 files |
+| Real-browser mobile | `npx playwright test` | **21 passed / 21** — 7 scenarios x 375x812, 390x844, 412x915, Chromium 151.0.7922.34 against the production preview build |
+| TypeScript | `tsc -b` | clean |
+| Lint | `eslint src tests --max-warnings 0` | clean |
+| Production build | `npm run build` | ok — `dist/` + inlined standalone `index.html` |
+| Dependency audit | `npm audit` (dev + prod) | 0 vulnerabilities |
+
+Earlier revisions could not execute Playwright in this sandbox. In revision 5 the missing
+Chromium shared libraries were extracted into a user-local prefix, so the browser suite was
+**actually executed** rather than merely written; the results above are observed, not claimed.
+
+**Deployment, verified live on 2026-09-02:** <https://planonit.netlify.app/> responds over
+HTTPS and the app boots and plans correctly there — but it is serving an **older build**. The
+live golden path renders the pre-revision-4 dinner → travel → movie itinerary, shows raw seat
+inventory ("29 seats available now"), and lacks the reservation-integrity check. Netlify builds
+from the last pushed commit; the working tree contains ~900 lines of unpushed work. **This is
+the single largest submission risk and it is not a code defect — it is a release step.** Commit
+and push `main`, then re-check the live URL, before submitting. Hosted provider state remains
+out of scope: the deployment has no server authority enabled (see §12).
+
+## 14. Revision 5 — abandoned in-flight reservation recovery
+
+### The defect (P1, correctness + dead-end UX)
+
+`reservation_pending` is deliberately immutable, and every mutation path enforces that through
+the single `isPlanImmutable` predicate. That is correct while an attempt is genuinely in
+flight. It is a dead end once the attempt is *not* in flight: a tab that wrote the pending
+state and was then closed, reloaded, or crashed leaves a persisted plan that `update_plan`,
+`repair_plan`, `approve`, `reserve_plan`, and `start_new_plan` all refuse — with the ledger
+holding nothing, so no inventory was ever consumed. The only escape was the destructive
+Reset, which throws away the draft. This was reproduced as a failing scenario before the fix
+(`tests/lifecycle.test.ts` → "reproduces the dead end: every path refuses a persisted pending
+plan"), which remains in the suite as the guard.
+
+### The fix
+
+`reconcileAbandonedReservation(plan, provider)` runs once at load, when nothing can be in
+flight in this process, and only for `reservation_pending`:
+
+- If the authoritative ledger holds a **confirmed** commitment whose content fingerprint
+  matches the plan's exact intent, the plan is promoted to `reserved` using the ledger's own
+  record. A commitment that really happened is never lost, hidden, or duplicated.
+- Otherwise nothing was committed, so the attempt is recorded as `reservation_failed` with its
+  holds released, `failureCode: RESERVATION_ABANDONED`, and approval cleared — the human must
+  approve again.
+
+The version never moves, no inventory is consumed, no ledger entry is written, and a ledger
+entry belonging to a *different* intent is refused rather than adopted. The recovered state is
+written back with the stored plan as the CAS token so the workspace converges instead of
+recovering on every reload, and the recovery is recorded in the activity trail.
+
+### Also fixed in revision 5
+
+- **Reversed evening order in the plan summary.** The current-plan header read
+  "<restaurant> followed by <movie>", implying dinner precedes the film. It now reads
+  "<movie>, then dinner at <restaurant>", matching the movie → travel → dinner model used
+  everywhere else and by the feasibility engine.
+- **Duplicated screen-reader announcement.** Every toast was announced twice: once by the
+  persistent `.sr-live` region and once by the toast's own `role="alert"`/`role="status"`.
+  The visible toast is now `aria-hidden`, and the single live region escalates to
+  `role="alert"`/`aria-live="assertive"` for errors.
+- **Stale documentation.** `docs/ADVERSARIAL_AUDIT.md` still claimed 112 tests and 12 tools;
+  a source comment cited a `tests/data.test.ts` that does not exist. Both corrected.
+
+### Regression coverage added
+
+Six domain-level tests in `tests/lifecycle.test.ts` (dead-end reproduction, release without
+consuming inventory, promotion from a matching ledger entry, refusal of a mismatched ledger
+entry, no effect on any other status, idempotence on repeat), one jsdom reload test in
+`tests/app.test.tsx`, and one real-browser reload test in `tests/browser/mobile.spec.ts`
+running at all three mobile viewports.

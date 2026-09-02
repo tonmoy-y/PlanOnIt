@@ -5,6 +5,21 @@ import { compareAndSwapState, loadState, saveState, STORAGE_KEY, subscribeState 
 
 describe('local persistence adapter',()=>{beforeEach(()=>localStorage.clear());it('restores plan version and history after reload',()=>{const plan=initialPlan();plan.version=7;saveState(plan,[{id:'a',text:'Changed plan',detail:'Human edit',source:'human',timestamp:new Date().toISOString(),planVersion:7}]);const loaded=loadState();expect(loaded.plan.version).toBe(7);expect(loaded.activity[0].text).toBe('Changed plan');});it('recovers safely from malformed storage',()=>{localStorage.setItem(STORAGE_KEY,'{"plan":"bad"}');expect(loadState().plan.version).toBe(1);});it('notifies another tab with plan and provider state',()=>{const plan=initialPlan();plan.version=3;const states:ReturnType<typeof loadState>[]=[];const stop=subscribeState(state=>states.push(state));window.dispatchEvent(new StorageEvent('storage',{key:STORAGE_KEY,newValue:JSON.stringify({plan,activity:[],writerId:'other',provider:{revision:2,restaurantCapacity:{slot:1},showtimeSeats:{show:2},reservations:{}}})}));stop();expect(states).toHaveLength(1);expect(states[0].plan.version).toBe(3);expect(states[0].provider?.revision).toBe(2);});});
 
+describe('storage hardening',()=>{
+  beforeEach(()=>localStorage.clear());
+  it('rejects a stored reservation that carries no content fingerprint',()=>{
+    const plan={...initialPlan(),status:'reserved',reservation:{id:'SBX-FORGED',planId:'current-plan',version:1,providerRevision:0,status:'confirmed',reservedAt:new Date().toISOString(),idempotencyKey:'current-plan:v1',inventory:[]}};
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({plan,activity:[]}));
+    expect(loadState().plan.status).toBe('draft');
+    expect(loadState().plan.reservation).toBeUndefined();
+  });
+  it('ignores a stored provider ledger that fails schema validation',()=>{
+    const plan=initialPlan();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({plan,activity:[],provider:{revision:-1,restaurantCapacity:{},showtimeSeats:{},reservations:{}}}));
+    expect(loadState().provider).toBeUndefined();
+  });
+});
+
 describe('optimistic workspace writes',()=>{
   beforeEach(()=>localStorage.clear());
   it('allows exactly one of two simultaneous mutations from the same snapshot',async()=>{const original=initialPlan();saveState(original,[]);const a={...original,version:2,budget:5500,updatedAt:'2026-09-02T00:00:00.001Z'};const b={...original,version:2,people:4,updatedAt:'2026-09-02T00:00:00.002Z'};const [first,second]=await Promise.all([compareAndSwapState({plan:original},{plan:a,activity:[],writerId:'a'}),compareAndSwapState({plan:original},{plan:b,activity:[],writerId:'b'})]);expect([first.ok,second.ok].sort()).toEqual([false,true]);const stored=loadState().plan;expect(stored.version).toBe(2);expect(stored.budget===5500||stored.people===4).toBe(true);expect(stored.budget===5500&&stored.people===4).toBe(false);});

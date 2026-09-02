@@ -116,5 +116,77 @@ for(const viewport of MOBILE_VIEWPORTS){
       await expect(page.getByText(/Still committed · superseded/)).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
     });
+
+    test('presents restaurants as opening windows and price bands, not raw inventory',async({page})=>{
+      await installModelContext(page);
+      await page.goto('/');
+      await page.getByRole('button',{name:'2. Explore'}).click();
+      await expect(page.getByRole('heading',{name:'Movie'})).toBeVisible();
+      const dinner=page.locator('.explore-section').nth(1);
+      await expect(dinner.getByText(/Open 17:00–23:00/).first()).toBeVisible();
+      await expect(dinner.locator('.price-band').first()).toContainText('/ person');
+      expect(await dinner.locator('.choice-card').first().innerText()).not.toMatch(/\d+ left/);
+      // the movie section comes first in the DOM, so the chronology reads movie → dinner
+      const headings=await page.locator('.section-title h2').allInnerTexts();
+      expect(headings[0]).toContain('Movie');
+      expect(headings[1]).toContain('Dinner');
+      await noHorizontalOverflow(page,viewport.width);
+    });
+
+    /** BUG-3: a real reload of a workspace stranded in reservation_pending must come back usable. */
+    test('recovers a real reload of a workspace stranded mid-reservation',async({page})=>{
+      await installModelContext(page);
+      await page.goto('/');
+      await page.getByRole('button',{name:/Create plan preview/}).click();
+      await page.getByRole('button',{name:/Approve this plan/}).click();
+      const approvedVersion=await page.evaluate(()=>{
+        const state=JSON.parse(localStorage.getItem('planonit.state.v5')!);
+        state.plan.status='reservation_pending';
+        state.plan.reservation={id:'PENDING-CURRENT-PLAN',planId:state.plan.id,version:state.plan.version,providerRevision:0,status:'pending',reservedAt:new Date().toISOString(),idempotencyKey:'fp1_stale',fingerprint:'fp1_stale',inventory:[{kind:'showtime',inventoryKey:state.plan.selections.showtimeId,quantity:state.plan.people,state:'held'}]};
+        localStorage.setItem('planonit.state.v5',JSON.stringify(state));
+        return state.plan.version as number;
+      });
+      await page.reload();
+      await expect(page.getByText('Reservation failed').first()).toBeVisible();
+      await expect(page.getByRole('button',{name:/Confirming with the provider/})).toHaveCount(0);
+      const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('planonit.state.v5')!));
+      expect(recovered.plan.status).toBe('reservation_failed');
+      expect(recovered.plan.version).toBe(approvedVersion);
+      expect(Object.keys(recovered.provider.reservations)).toHaveLength(0);
+      // The human can carry on: approve again and reserve for real.
+      await page.getByRole('button',{name:/Approve this plan/}).click();
+      await page.getByRole('button',{name:/Confirm sandbox reservation/}).click();
+      await expect(page.getByText('Reserved · confirmed').first()).toBeVisible();
+      await noHorizontalOverflow(page,viewport.width);
+    });
+
+    test('locks editing controls once a plan is reserved and offers a PlanOnIt-only reset',async({page})=>{
+      await installModelContext(page);
+      await page.goto('/');
+      await page.getByRole('button',{name:/Create plan preview/}).click();
+      await page.getByRole('button',{name:/Approve this plan/}).click();
+      await page.getByRole('button',{name:/Confirm sandbox reservation/}).click();
+      await expect(page.getByText('Reserved · confirmed').first()).toBeVisible();
+      await expect(page.getByRole('button',{name:/Repair plan now/})).toHaveCount(0);
+      await expect(page.getByRole('button',{name:/Edit choices/})).toHaveCount(0);
+      await page.getByRole('button',{name:'1. Goal'}).click();
+      await expect(page.getByLabel('Budget')).toBeDisabled();
+      await expect(page.getByLabel('Date')).toBeDisabled();
+      await page.getByRole('button',{name:'2. Explore'}).click();
+      await expect(page.locator('.locked-banner')).toBeVisible();
+
+      await page.getByRole('button',{name:'3. Plan'}).click();
+      await page.getByRole('button',{name:/Reset plan/}).click();
+      const dialog=page.getByRole('alertdialog',{name:'Confirm reset'});
+      await expect(dialog).toContainText('Only PlanOnIt');
+      await expect(dialog).toContainText('reset does not cancel');
+      await page.evaluate(()=>localStorage.setItem('unrelated.site.key','keep-me'));
+      await dialog.getByRole('button',{name:/Reset PlanOnIt/}).click();
+      await expect(page.getByText('Draft · not started').first()).toBeVisible();
+      expect(await page.evaluate(()=>localStorage.getItem('unrelated.site.key'))).toBe('keep-me');
+      await page.reload();
+      await expect(page.getByText('Draft · not started').first()).toBeVisible();
+      await noHorizontalOverflow(page,viewport.width);
+    });
   });
 }
