@@ -112,7 +112,7 @@ When an evening's date falls behind the window, the plan stops being currently v
 - WebMCP availability depends on the currently supported ChatGPT built-in browser and model environment.
 - No Devpost submission or uploaded demo video is claimed.
 
-See [the judge guide](docs/JUDGE_GUIDE.md) and [demo script](docs/DEMO_SCRIPT.md).
+
 
 ## MIT License
 
