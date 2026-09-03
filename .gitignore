@@ -18,7 +18,6 @@ coverage/
 .env
 .env.*
 *.local
-FINAL_REPORT.md
 # Logs
 *.log
 npm-debug.log*

@@ -8,7 +8,7 @@
 | Bypass the UI and call the domain directly | `applyPlanUpdate` itself parses `updatePlanSchema`; callers cannot skip runtime validation. |
 | Mismatch movie and showtime | Atomic pair validation rejects it and movie cost remains null rather than zero. |
 | Reuse transport after venue change | Options belong to one origin/destination route; incompatible transport is cleared. |
-| Approve stale/invalid plan | Exact version, eight checks, and provider revision gate approval/reservation. |
+| Approve stale/invalid plan | Exact version, nine checks, and provider revision gate approval/reservation. |
 | Inventory disappears after approval | `PROVIDER_STATE_CHANGED` forces revalidation and renewed human approval. |
 | Provider conflict or failure | No inventory or reservation state is committed. |
 | Retry a successful reservation | The idempotency key returns the same confirmation with no second decrement. |

@@ -8,7 +8,7 @@ The independent 32.8/40 audit was reproduced before implementation. Its P0 exact
 
 ## 2. What Was Rebuilt
 
-Plan status now follows explicit draft, valid, approved, reservation-pending, reserved, and reservation-failed semantics. Reservations carry plan/version identity, provider revision, idempotency key, and inventory records. Failed attempts release attempted inventory and consume nothing. The provider supports a declared 2026-09-03 through 2026-09-16 inventory window rather than pretending a two-day fixture exists on arbitrary dates.
+Plan status now follows explicit draft, valid, approved, reservation-pending, reserved, and reservation-failed semantics. Reservations carry plan/version identity, provider revision, idempotency key, and inventory records. Failed attempts release attempted inventory and consume nothing. The provider supports a rolling 14-day inventory window starting two days out from whatever "today" is, rather than pretending a two-day fixture exists on arbitrary dates.
 
 ## 3. UX Overhaul
 
@@ -16,7 +16,7 @@ The existing visual system was retained and improved surgically. A restored plan
 
 ## 4. WebMCP Improvements
 
-All 12 imperative tools use strict runtime validation and aligned JSON Schema bounds. Every success and error includes current plan/provider context. `get_current_plan` returns current ownership-aware provider snapshots; `update_plan` treats unchanged input as a no-op; `repair_plan` records its dependency recalculation; and `reserve_plan` reports explicit transitions and cannot bypass human approval. The built-in browser discovered and directly invoked the live tools: it rejected an unsupported date, created a valid preference-sensitive plan, updated the visible UI, and returned the same current snapshot afterward.
+All 13 imperative tools use strict runtime validation and aligned JSON Schema bounds. Every success and error includes current plan/provider context. `get_current_plan` returns current ownership-aware provider snapshots; `update_plan` treats unchanged input as a no-op; `repair_plan` records its dependency recalculation; and `reserve_plan` reports explicit transitions and cannot bypass human approval. The built-in browser discovered and directly invoked the live tools: it rejected an unsupported date, created a valid preference-sensitive plan, updated the visible UI, and returned the same current snapshot afterward.
 
 ## 5. Provider / Persistence Architecture
 
