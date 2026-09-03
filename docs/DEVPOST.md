@@ -36,7 +36,7 @@ Before this pattern, a person either had to trust an agent's account of what it 
 
 ## Try it
 
-- **Live app:** https://REPLACE-WITH-VERCEL-URL (open in ChatGPT's in-app browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled)
+- **Live app:** https://plan-on-it.vercel.app (open in ChatGPT's in-app browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled)
 - **Repository:** https://github.com/tonmoy-y/PlanOnIt (MIT licensed)
 - No login or account is required to use or judge the app.
 - Once on the Goal tab, copy the on-page suggested request and hand it to the agent as-is — it already names a date inside the app's rolling two-week supported window, so it works regardless of when you're testing.

@@ -4,7 +4,7 @@ PlanOnIt is a human-controlled planning workspace where an external AI agent can
 
 [Public repository](https://github.com/tonmoy-y/PlanOnIt)
 
-**Live deployment:** <https://REPLACE-WITH-VERCEL-URL> — served over HTTPS from Vercel, built from this repository on push. `vercel.json` holds the build output directory and security-header settings.
+**Live deployment:** <https://plan-on-it.vercel.app> — served over HTTPS from Vercel, built from this repository on push. `vercel.json` holds the build output directory and security-header settings.
 
 ## Run and verify
 

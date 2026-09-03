@@ -124,7 +124,7 @@ export default function App(){
 }
 
 function Header({tab,setTab}:{tab:Tab;setTab:(tab:Tab)=>void}){
-  const nav:[Tab,string,React.ReactNode][]=[['goal','1. Goal',<Sparkles/>],['explore','2. Explore',<Pencil/>],['plan','3. Plan',<ShieldCheck/>],['activity','Activity',<History/>]];
+  const nav:[Tab,string,React.ReactNode][]=[['goal','Goal',<Sparkles/>],['explore','Explore',<Pencil/>],['plan','Plan',<ShieldCheck/>],['activity','Activity',<History/>]];
   // Arrow keys move between steps the way a keyboard user expects; Tab still exits the group.
   const onKey=(event:React.KeyboardEvent<HTMLElement>)=>{
     const order=nav.map(([id])=>id);const index=order.indexOf(tab);
