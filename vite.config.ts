@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        // Content-hashed filenames so every deploy gets a fresh URL: Netlify serves
+        // Content-hashed filenames so every deploy gets a fresh URL: the host serves
         // /assets/* with a one-year immutable Cache-Control, so a hashless filename
         // meant returning visitors' browsers kept the previous deploy's JS/CSS forever.
         entryFileNames: 'assets/[name]-[hash].js',

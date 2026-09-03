@@ -4,15 +4,7 @@ PlanOnIt is a human-controlled planning workspace where an external AI agent can
 
 [Public repository](https://github.com/tonmoy-y/PlanOnIt)
 
-**Live deployment:** <https://planonit.netlify.app/> — served over HTTPS from Netlify, built from this repository on push. `netlify.toml` holds the build, publish, function and security-header settings.
-
-> ℹ️ **Cache note.** Netlify served `/assets/*` with a one-year immutable `Cache-Control`,
-> but earlier builds gave the JS/CSS bundle the same filename on every deploy
-> (`assets/index.js`). A returning browser therefore kept the previous deploy's bundle
-> indefinitely and never saw new work land, even though `main` was up to date. As of the
-> 2026-09-03 fix, `vite.config.ts` content-hashes the built filenames, so each deploy gets a
-> new URL and this cannot happen again. If you visited the site before this fix, hard-refresh
-> once (Cmd/Ctrl+Shift+R) to drop the stale cached bundle.
+**Live deployment:** <https://REPLACE-WITH-VERCEL-URL> — served over HTTPS from Vercel, built from this repository on push. `vercel.json` holds the build output directory and security-header settings.
 
 ## Run and verify
 
@@ -32,7 +24,7 @@ npm audit --omit=dev
 npm run preview
 ```
 
-`npm run build` creates the normal Netlify-ready `dist/` output and regenerates the committed root `index.html` as a single file with inlined CSS and JavaScript. The root file can therefore be opened directly without the previous `file://` asset failure.
+`npm run build` creates the normal `dist/` output that Vercel deploys and regenerates the committed root `index.html` as a single file with inlined CSS and JavaScript. The root file can therefore be opened directly without the previous `file://` asset failure.
 
 ## Judge fast path
 
@@ -96,7 +88,6 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/validation.ts` — strict shared schemas, including non-normalizing calendar-date validation.
 - `src/tools.ts` — 13 imperative WebMCP definitions and handlers.
 - `src/authority.ts` — the reservation transaction boundary: the local sandbox authority (default) and a token-authenticated, server-to-server remote authority.
-- `netlify/functions/reserve.mjs` — optional server-authoritative reservation transaction.
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
@@ -124,7 +115,7 @@ When an evening's date falls behind the window, the plan stops being currently v
 ## Honest scope
 
 - Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
-- **Reservation authority.** By default the browser-local sandbox provider is its own authority, and that is what the live deployment runs. `src/authority.ts` also ships `RemoteReservationAuthority` and `netlify/functions/reserve.mjs`, which move capacity, idempotency and provider revisions to a server that re-checks every commitment and writes the ledger with a conditional `onlyIfMatch` compare-and-swap (a losing concurrent commit gets `AUTHORITY_REVISION_CONFLICT`, not a silent overwrite).
+- **Reservation authority.** By default the browser-local sandbox provider is its own authority, and that is what the live deployment runs. `src/authority.ts` also ships `RemoteReservationAuthority`, an extension point for a server that re-checks every commitment and writes the ledger with a conditional `onlyIfMatch` compare-and-swap (a losing concurrent commit gets `AUTHORITY_REVISION_CONFLICT`, not a silent overwrite) — no concrete server implementation ships with this build.
 - **The remote authority is deliberately not reachable from the browser.** It requires a bearer token, and no credential is ever read into the client bundle — anything prefixed `VITE_` is public, so shipping a shared secret there would be authentication theatre. The endpoint is therefore usable only by trusted server-side callers, is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT`, and is **not enabled or verified in production**. With no endpoint configured the verified local behavior runs unchanged.
 - Reads (browsing inventory) are deliberately local and synchronous; only the consequential write crosses the authority boundary.
 - The mutable provider and shared workspace persist per browser origin. Same-origin tabs use a Web Locks-backed compare-and-swap boundary; stale writes fail with `CONCURRENT_WRITE_CONFLICT` or `STALE_PLAN_VERSION` and tabs converge through storage events. There is no account or cross-device server state — deliberately: this build does not ask for a login at all, so there is nothing to authenticate.

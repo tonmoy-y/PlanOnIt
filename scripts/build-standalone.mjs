@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 const projectRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const assetsDir=resolve(projectRoot,'dist/assets');
-// Vite now content-hashes the built filenames (assets/index-<hash>.js/.css) so Netlify's
+// Vite now content-hashes the built filenames (assets/index-<hash>.js/.css) so a host's
 // immutable long-lived cache header is safe across deploys. There is exactly one JS
 // entry and one CSS file (no dynamic imports in this app), so find them by extension
 // rather than assuming a fixed name.
