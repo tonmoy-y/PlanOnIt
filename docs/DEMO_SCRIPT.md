@@ -2,7 +2,7 @@
 
 ## 0:00–0:35 — One clear promise
 
-Show the Goal screen: “Tell an agent what you want. Keep the final say.” Point to the shared version strip and the `Agent-ready · 13 tools` state. Copy the canonical request.
+Show the Goal screen: “Tell an agent what you want. Keep the final say.” Point to the shared version strip and the agent card's “Your agent can use this page” state once tools register. Copy the canonical request.
 
 ## 0:35–1:15 — Agent creates evidence
 

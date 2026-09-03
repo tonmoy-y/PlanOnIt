@@ -3,8 +3,8 @@
 ## Five-minute path
 
 1. Run `npm install && npm run dev` and open the URL in the supported ChatGPT built-in browser.
-2. Confirm `Agent-ready · 13 tools` and copy the on-page agent request.
-3. Have the external agent create a plan. Open **3. Plan** and inspect the exact table slot, movie/showtime, route, chronology, scaled cost, eight checks, plan version, and provider revision.
+2. Confirm the Goal tab's agent card reads "Your agent can use this page" (WebMCP tools registered - 13 of them; the header carries no status pill by design) and copy the on-page agent request.
+3. Have the external agent create a plan. Open **3. Plan** and inspect the exact table slot, movie/showtime, route, chronology, scaled cost, nine checks, plan version, and provider revision.
 4. Open **2. Explore**, change the film or the restaurant, and return to Plan. If the route or chronology breaks, the repair callout must name each failed check.
 5. Ask the agent: “Repair PlanOnIt plan vN. Preserve the restaurant if possible, explain every changed dependency, and validate the result.”
 6. Try a mutation with the previous version; expect `STALE_PLAN_VERSION`.

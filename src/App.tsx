@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, CircleDollarSign, Clock3, Copy, History, Lock, MapPin, Navigation, Pencil, RefreshCw, RotateCcw, Route as RouteIcon, ShieldCheck, Sparkles, Star, Ticket, User as UserIcon, Users, Utensils, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, CircleDollarSign, Clock3, Copy, History, Lock, MapPin, Navigation, Pencil, RefreshCw, RotateCcw, Route as RouteIcon, ShieldCheck, Sparkles, Star, Ticket, Users, Utensils, Wrench, XCircle } from 'lucide-react';
 import { cinemas, movies, restaurants } from './data';
-import { applyPlanUpdate, approvePlan, bestDinnerSlot, createBlankPlan, dateOutsideWindow, evaluatePlan, isPlanImmutable, immutableReason, rankedDinnerSlots, reconcileAbandonedReservation, repairPlan, reservePlan, snapshotPlan, solvePlan, startNewPlan } from './domain';
+import { applyPlanUpdate, approvePlan, bestDinnerSlot, createBlankPlan, evaluatePlan, isPlanImmutable, immutableReason, rankedDinnerSlots, reconcileAbandonedReservation, repairPlan, reservePlan, snapshotPlan, solvePlan, startNewPlan } from './domain';
 import { resolveAuthority } from './authority';
 import { compareAndSwapState, loadState, resetWorkspace, subscribeState } from './persistence';
 import { demoProvider } from './providers';
@@ -31,10 +31,8 @@ export default function App(){
   const [syncMessage,setSyncMessage]=useState(restored.resolved==='reserved'?'An interrupted reservation was recovered from the provider ledger.':restored.resolved==='failed'?'An interrupted reservation attempt was released; no inventory was consumed.':'This browser tab is current.');
   const [webmcp,setWebmcp]=useState<WebMcpState>(()=>typeof document.modelContext?.registerTool==='function'?'registering':'unavailable');
   const [toast,setToast]=useState<{tone:'ok'|'error';text:string}|null>(null);
-  const {account,setAccount,signOut}=useAccount();
   const authority=useMemo(()=>resolveAuthority(demoProvider,{endpoint:import.meta.env.VITE_PLANONIT_AUTHORITY_ENDPOINT}),[]);
   const planRef=useRef(plan);const activityRef=useRef(activity);const writerId=useRef(uid());
-  const planSyncTimer=useRef<number|undefined>(undefined);const cloudPlanLoadedFor=useRef<string|null>(null);
   const snapshot=useMemo(()=>{void providerTick;return snapshotPlan(plan,demoProvider);},[plan,providerTick]);
 
   // The expected token is the plan as it was *stored*, so a recovered pending plan can be
@@ -58,51 +56,6 @@ export default function App(){
     planRef.current=next;activityRef.current=nextActivity;setPlanState(next);setActivity(nextActivity);setProviderTick(demoProvider.revision);return saved;
   },[]);
   const commitExternal=useCallback(async(next:Plan,text:string)=>{const result=await commit(next,text,'external-agent');if(result.ok)announce('Agent updated the shared workspace');return result;},[announce,commit]);
-
-  // Cross-device plan sync (accounts, added 2026-09). Only pre-reservation planning fields
-  // are ever sent - never status, approval, or reservation, since the sandbox inventory
-  // ledger they depend on lives in this one browser and is never synced. Last write wins;
-  // see netlify/functions/plan-sync.mjs for the full scope and reasoning.
-  useEffect(()=>{
-    if(account.state!=='signed-in'||typeof fetch!=='function')return;
-    if(plan.status!=='draft'&&plan.status!=='valid')return;
-    window.clearTimeout(planSyncTimer.current);
-    planSyncTimer.current=window.setTimeout(()=>{
-      const body=JSON.stringify({plan:{city:plan.city,date:plan.date,people:plan.people,budget:plan.budget,preferences:plan.preferences,dinnerDurationMinutes:plan.dinnerDurationMinutes,bufferMinutes:plan.bufferMinutes,selections:plan.selections}});
-      fetch('/api/plan',{method:'PUT',credentials:'include',headers:{'content-type':'application/json'},body}).catch(()=>{/* best-effort; the local workspace stays the source of truth */});
-    },600);
-    return()=>window.clearTimeout(planSyncTimer.current);
-  },[account.state,plan]);
-
-  useEffect(()=>{
-    if(account.state!=='signed-in'||typeof fetch!=='function')return;
-    if(cloudPlanLoadedFor.current===account.user.id)return;
-    cloudPlanLoadedFor.current=account.user.id;
-    if(planStarted(planRef.current))return;
-    (async()=>{
-      try{
-        const response=await fetch('/api/plan',{credentials:'include'});
-        if(!response.ok)return;
-        const body=await response.json().catch(()=>null);
-        const saved=body?.ok?body.plan:null;
-        if(!saved||planStarted(planRef.current))return;
-        const overrides:Partial<Pick<Plan,'city'|'date'|'people'|'budget'>>={};
-        if(typeof saved.city==='string'&&saved.city)overrides.city=saved.city;
-        if(typeof saved.date==='string'&&saved.date&&!dateOutsideWindow(saved.date))overrides.date=saved.date;
-        if(typeof saved.people==='number'&&saved.people>0)overrides.people=saved.people;
-        if(typeof saved.budget==='number'&&saved.budget>=0)overrides.budget=saved.budget;
-        const next=createBlankPlan(overrides);
-        next.version=planRef.current.version+1;
-        if(saved.preferences&&typeof saved.preferences==='object')next.preferences={...next.preferences,...saved.preferences};
-        if(saved.selections&&typeof saved.selections==='object')next.selections=saved.selections;
-        if(typeof saved.dinnerDurationMinutes==='number')next.dinnerDurationMinutes=saved.dinnerDurationMinutes;
-        if(typeof saved.bufferMinutes==='number')next.bufferMinutes=saved.bufferMinutes;
-        next.changeSummary='Restored your saved plan';
-        const result=await commit(next,'Restored your saved plan from your account','system','Loaded from your PlanOnIt account');
-        if(result.ok)announce('Loaded your saved plan from your account');
-      }catch{/* best-effort restore; the fresh local draft is a fine fallback */}
-    })();
-  },[account,commit,announce]);
 
   useEffect(()=>{
     if(typeof document.modelContext?.registerTool!=='function')return;
@@ -155,7 +108,7 @@ export default function App(){
   const reserve=async()=>{const result=await reservePlan(planRef.current,planRef.current.version,demoProvider,async pending=>{await commit(pending,`Reservation pending for version ${pending.version}`,'system',authority.kind==='remote'?'Awaiting the authoritative reservation service':'Provider confirmation in progress');},authority,()=>planRef.current);if(!result.ok){if(result.error.code==='RESERVATION_STATE_CHANGED'){const authoritative=loadState();demoProvider.importState(authoritative.provider);planRef.current=authoritative.plan;activityRef.current=authoritative.activity;setPlanState(authoritative.plan);setActivity(authoritative.activity);setProviderTick(demoProvider.revision);setSyncMessage('A newer version arrived while the reservation was in flight; the newer state was kept.');showError(result.error);return;}if(result.plan){const saved=await commit(result.plan,`Reservation failed: ${result.error.code}`,'human',result.error.message);if(!saved.ok){showError(saved.error);return;}}showError(result.error);return;}const saved=await commit(result.data.plan,`${result.data.idempotent?'Returned':'Created'} ${result.data.reservationId}`,'human',result.data.message);if(!saved.ok){showError(saved.error);return;}announce(result.data.idempotent?'Existing confirmation returned':'Sandbox inventory confirmed');};
 
   return <div className="app">
-    <Header tab={tab} setTab={setTab} account={account} setAccount={setAccount} signOut={signOut}/>
+    <Header tab={tab} setTab={setTab}/>
     <main className="main">
       <PlanStrip plan={plan} snapshot={snapshot} setTab={setTab}/>
       {tab==='goal'&&<Goal plan={plan} snapshot={snapshot} webmcp={webmcp} update={update} changeDate={changeDate} runQuickPlanner={runQuickPlanner} setTab={setTab}/>}
@@ -170,7 +123,7 @@ export default function App(){
   </div>;
 }
 
-function Header({tab,setTab,account,setAccount,signOut}:{tab:Tab;setTab:(tab:Tab)=>void;account:AccountStatus;setAccount:(status:AccountStatus)=>void;signOut:()=>Promise<void>}){
+function Header({tab,setTab}:{tab:Tab;setTab:(tab:Tab)=>void}){
   const nav:[Tab,string,React.ReactNode][]=[['goal','1. Goal',<Sparkles/>],['explore','2. Explore',<Pencil/>],['plan','3. Plan',<ShieldCheck/>],['activity','Activity',<History/>]];
   // Arrow keys move between steps the way a keyboard user expects; Tab still exits the group.
   const onKey=(event:React.KeyboardEvent<HTMLElement>)=>{
@@ -182,89 +135,10 @@ function Header({tab,setTab,account,setAccount,signOut}:{tab:Tab;setTab:(tab:Tab
     setTab(target);
     (event.currentTarget.querySelectorAll('button')[order.indexOf(target)] as HTMLButtonElement|undefined)?.focus();
   };
-  return <header className="topbar"><Brand/><nav aria-label="Planning steps" onKeyDown={onKey}>{nav.map(([id,label,icon])=><button key={id} className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{icon}<span>{label}</span></button>)}</nav><div className="topbar-right"><AccountControl account={account} setAccount={setAccount} signOut={signOut}/></div></header>;
+  return <header className="topbar"><Brand/><nav aria-label="Planning steps" onKeyDown={onKey}>{nav.map(([id,label,icon])=><button key={id} className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{icon}<span>{label}</span></button>)}</nav></header>;
 }
-// No navbar status pill: WebMCP connection state is shown where it is relevant instead - the Goal tab's agent card and the Activity page - not as jargon in chrome every screen shares.
+// No navbar status pill and no account chrome: WebMCP connection state is shown where it is relevant instead - the Goal tab's agent card and the Activity page.
 function Brand(){return <button className="brand" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="PlanOnIt home"><span className="brandmark">P</span><span>plan<span>on</span>it</span></button>;}
-
-/**
- * Real accounts, added 2026-09. Backed by netlify/functions/auth-*.mjs (Netlify Blobs for
- * storage, scrypt-hashed passwords, a signed httpOnly session cookie) - not a mock and not
- * wired to fake data. Signing in does one concrete thing beyond showing a name: the
- * pre-reservation planning fields of the current plan sync to the account (see the
- * useEffect pair in App() and netlify/functions/plan-sync.mjs), so the same evening can be
- * picked up on another device. Anything reservation-shaped stays purely local - see that
- * file for exactly why.
- */
-type Account={id:string;email:string;name:string|null};
-type AccountStatus={state:'checking'}|{state:'signed-out'}|{state:'signed-in';user:Account};
-
-function useAccount(){
-  const [account,setAccount]=useState<AccountStatus>({state:'checking'});
-  useEffect(()=>{
-    let cancelled=false;
-    (async()=>{
-      if(typeof fetch!=='function'){setAccount({state:'signed-out'});return;}
-      try{
-        const response=await fetch('/api/auth/me',{credentials:'include'});
-        if(cancelled)return;
-        if(response.ok){const body=await response.json();setAccount({state:'signed-in',user:body.user});}
-        else setAccount({state:'signed-out'});
-      }catch{if(!cancelled)setAccount({state:'signed-out'});}
-    })();
-    return()=>{cancelled=true;};
-  },[]);
-  const signOut=async()=>{
-    try{await fetch('/api/auth/logout',{method:'POST',credentials:'include'});}catch{/* the cookie is httpOnly; treat the client as signed out either way */}
-    setAccount({state:'signed-out'});
-  };
-  return {account,setAccount,signOut};
-}
-
-function AccountControl({account,setAccount,signOut}:{account:AccountStatus;setAccount:(status:AccountStatus)=>void;signOut:()=>Promise<void>}){
-  const [open,setOpen]=useState(false);
-  const [mode,setMode]=useState<'signin'|'signup'>('signin');
-  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [name,setName]=useState('');
-  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
-
-  const submit=async(event:React.FormEvent)=>{
-    event.preventDefault();
-    if(typeof fetch!=='function')return;
-    setError('');setBusy(true);
-    try{
-      const response=await fetch(mode==='signin'?'/api/auth/login':'/api/auth/signup',{
-        method:'POST',credentials:'include',headers:{'content-type':'application/json'},
-        body:JSON.stringify(mode==='signin'?{email,password}:{email,password,name}),
-      });
-      const body=await response.json().catch(()=>null);
-      if(!response.ok||!body?.ok){setError(body?.error?.message??'Something went wrong. Try again.');setBusy(false);return;}
-      setAccount({state:'signed-in',user:body.user});setOpen(false);setPassword('');setBusy(false);
-    }catch{setError('Could not reach the server. Try again.');setBusy(false);}
-  };
-
-  if(account.state==='checking')return <div className="account-control" aria-hidden="true"/>;
-
-  if(account.state==='signed-in')return <div className="account-control">
-    <span className="account-name"><UserIcon/> {account.user.name||account.user.email}</span>
-    <button className="text-button" onClick={()=>void signOut()}>Sign out</button>
-  </div>;
-
-  return <div className="account-control">
-    <button className="text-button" onClick={()=>setOpen(value=>!value)} aria-expanded={open} aria-controls="account-panel">Sign in</button>
-    {open&&<form id="account-panel" className="account-panel" aria-label={mode==='signin'?'Sign in':'Create account'} onSubmit={event=>void submit(event)}>
-      <p className="account-blurb">Save your plan and pick it up on another device.</p>
-      <div className="account-tabs">
-        <button type="button" className={mode==='signin'?'active':''} onClick={()=>setMode('signin')}>Sign in</button>
-        <button type="button" className={mode==='signup'?'active':''} onClick={()=>setMode('signup')}>Create account</button>
-      </div>
-      {mode==='signup'&&<label><span>Name</span><input value={name} onChange={event=>setName(event.target.value)} autoComplete="name"/></label>}
-      <label><span>Email</span><input type="email" required value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email"/></label>
-      <label><span>Password</span><input type="password" required minLength={8} value={password} onChange={event=>setPassword(event.target.value)} autoComplete={mode==='signin'?'current-password':'new-password'}/></label>
-      {error&&<small className="field-error" role="alert">{error}</small>}
-      <button className="primary full" type="submit" disabled={busy}>{busy?'Please wait…':mode==='signin'?'Sign in':'Create account'}</button>
-    </form>}
-  </div>;
-}
 
 function PlanStrip({plan,snapshot,setTab}:{plan:Plan;snapshot:ReturnType<typeof snapshotPlan>;setTab:(tab:Tab)=>void}){
   // Before anything is chosen there is nothing to score, and a "2/10 checks" badge on an
