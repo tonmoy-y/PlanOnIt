@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, CircleDollarSign, Clock3, Copy, History, Lock, MapPin, Navigation, Pencil, RefreshCw, RotateCcw, Route as RouteIcon, ShieldCheck, Sparkles, Star, Ticket, Users, Utensils, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, CircleDollarSign, Clock3, Copy, History, Lock, MapPin, Navigation, Pencil, RefreshCw, RotateCcw, Route as RouteIcon, ShieldCheck, Sparkles, Star, Ticket, User as UserIcon, Users, Utensils, Wrench, XCircle } from 'lucide-react';
 import { cinemas, movies, restaurants } from './data';
 import { applyPlanUpdate, approvePlan, bestDinnerSlot, createBlankPlan, evaluatePlan, isPlanImmutable, immutableReason, rankedDinnerSlots, reconcileAbandonedReservation, repairPlan, reservePlan, snapshotPlan, solvePlan, startNewPlan } from './domain';
 import { resolveAuthority } from './authority';
@@ -138,7 +138,7 @@ function Header({tab,setTab,webmcp,agentWorking}:{tab:Tab;setTab:(tab:Tab)=>void
     setTab(target);
     (event.currentTarget.querySelectorAll('button')[order.indexOf(target)] as HTMLButtonElement|undefined)?.focus();
   };
-  return <header className="topbar"><Brand/><nav aria-label="Planning steps" onKeyDown={onKey}>{nav.map(([id,label,icon])=><button key={id} className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{icon}<span>{label}</span></button>)}</nav><WebMcpBadge state={webmcp} working={agentWorking}/></header>;
+  return <header className="topbar"><Brand/><nav aria-label="Planning steps" onKeyDown={onKey}>{nav.map(([id,label,icon])=><button key={id} className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{icon}<span>{label}</span></button>)}</nav><div className="topbar-right"><AccountControl/><WebMcpBadge state={webmcp} working={agentWorking}/></div></header>;
 }
 function Brand(){return <button className="brand" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="PlanOnIt home"><span className="brandmark">P</span><span>plan<span>on</span>it</span></button>;}
 function WebMcpBadge({state,working}:{state:WebMcpState;working:boolean}){
@@ -146,6 +146,84 @@ function WebMcpBadge({state,working}:{state:WebMcpState;working:boolean}){
   // "Working" is set only by a real registered-tool invocation. Nothing here simulates an agent.
   const label=state==='active'&&working?'Agent working…':copy[state];
   return <div className={`webmcp-pill ${state}${working?' working':''}`} title={label} aria-live="polite"><span className="pulse"/>{label}</div>;
+}
+
+/**
+ * Real accounts, added 2026-09. Backed by netlify/functions/auth-*.mjs (Netlify Blobs for
+ * storage, scrypt-hashed passwords, a signed httpOnly session cookie) - not a mock and not
+ * wired to fake data. This does not change how the plan/reservation workspace itself works:
+ * that stays the existing per-browser sandbox described in the README's "Honest scope"
+ * section. An account here is an identity a person can sign into and out of across visits;
+ * linking a plan's history to that identity is a reasonable next step, not this one.
+ */
+type Account={id:string;email:string;name:string|null};
+type AccountStatus={state:'checking'}|{state:'signed-out'}|{state:'signed-in';user:Account};
+
+function useAccount(){
+  const [account,setAccount]=useState<AccountStatus>({state:'checking'});
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      if(typeof fetch!=='function'){setAccount({state:'signed-out'});return;}
+      try{
+        const response=await fetch('/api/auth/me',{credentials:'include'});
+        if(cancelled)return;
+        if(response.ok){const body=await response.json();setAccount({state:'signed-in',user:body.user});}
+        else setAccount({state:'signed-out'});
+      }catch{if(!cancelled)setAccount({state:'signed-out'});}
+    })();
+    return()=>{cancelled=true;};
+  },[]);
+  const signOut=async()=>{
+    try{await fetch('/api/auth/logout',{method:'POST',credentials:'include'});}catch{/* the cookie is httpOnly; treat the client as signed out either way */}
+    setAccount({state:'signed-out'});
+  };
+  return {account,setAccount,signOut};
+}
+
+function AccountControl(){
+  const {account,setAccount,signOut}=useAccount();
+  const [open,setOpen]=useState(false);
+  const [mode,setMode]=useState<'signin'|'signup'>('signin');
+  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [name,setName]=useState('');
+  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
+
+  const submit=async(event:React.FormEvent)=>{
+    event.preventDefault();
+    if(typeof fetch!=='function')return;
+    setError('');setBusy(true);
+    try{
+      const response=await fetch(mode==='signin'?'/api/auth/login':'/api/auth/signup',{
+        method:'POST',credentials:'include',headers:{'content-type':'application/json'},
+        body:JSON.stringify(mode==='signin'?{email,password}:{email,password,name}),
+      });
+      const body=await response.json().catch(()=>null);
+      if(!response.ok||!body?.ok){setError(body?.error?.message??'Something went wrong. Try again.');setBusy(false);return;}
+      setAccount({state:'signed-in',user:body.user});setOpen(false);setPassword('');setBusy(false);
+    }catch{setError('Could not reach the server. Try again.');setBusy(false);}
+  };
+
+  if(account.state==='checking')return <div className="account-control" aria-hidden="true"/>;
+
+  if(account.state==='signed-in')return <div className="account-control">
+    <span className="account-name"><UserIcon/> {account.user.name||account.user.email}</span>
+    <button className="text-button" onClick={()=>void signOut()}>Sign out</button>
+  </div>;
+
+  return <div className="account-control">
+    <button className="text-button" onClick={()=>setOpen(value=>!value)} aria-expanded={open} aria-controls="account-panel">Sign in</button>
+    {open&&<form id="account-panel" className="account-panel" aria-label={mode==='signin'?'Sign in':'Create account'} onSubmit={event=>void submit(event)}>
+      <div className="account-tabs">
+        <button type="button" className={mode==='signin'?'active':''} onClick={()=>setMode('signin')}>Sign in</button>
+        <button type="button" className={mode==='signup'?'active':''} onClick={()=>setMode('signup')}>Create account</button>
+      </div>
+      {mode==='signup'&&<label><span>Name</span><input value={name} onChange={event=>setName(event.target.value)} autoComplete="name"/></label>}
+      <label><span>Email</span><input type="email" required value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email"/></label>
+      <label><span>Password</span><input type="password" required minLength={8} value={password} onChange={event=>setPassword(event.target.value)} autoComplete={mode==='signin'?'current-password':'new-password'}/></label>
+      {error&&<small className="field-error" role="alert">{error}</small>}
+      <button className="primary full" type="submit" disabled={busy}>{busy?'Please wait…':mode==='signin'?'Sign in':'Create account'}</button>
+    </form>}
+  </div>;
 }
 
 function PlanStrip({plan,snapshot,setTab}:{plan:Plan;snapshot:ReturnType<typeof snapshotPlan>;setTab:(tab:Tab)=>void}){
@@ -223,7 +301,7 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
   if(!started)return <>
     <PageTitle eyebrow="YOUR EVENING" title="Nothing planned yet." body={`${formatPlanDate(plan.date)} · ${peopleLabel(plan.people)} · ${money(plan.budget)} to spend.`} status="Draft"/>
     <section className="panel start-empty">
-      <Empty icon={<Ticket/>} title="Start with the film" body="PlanOnIt builds the evening around your showtime: the film first, then the journey, then a table booked for when you arrive."/>
+      <Empty icon={<Ticket/>} title="Start with a film" body="We'll build the evening around it — the showtime first, then the journey, then a table booked for when you arrive."/>
       <div className="start-actions">
         <button className="primary" onClick={()=>setTab('explore')}><Ticket/> Choose a film <ArrowRight/></button>
         <button className="secondary" onClick={()=>setTab('goal')}><Sparkles/> Change date, group or budget</button>
@@ -247,12 +325,6 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
           <TimelineRow icon={<Utensils/>} time={`${prettyTime(evaluation.timeline.dinnerStart)}–${prettyTime(evaluation.timeline.dinnerEnd)}`} title={restaurant?.name??'Restaurant'} detail={`${restaurant?.cuisine} · table for ${plan.people} · open ${restaurant?.openingHours}`}/>
         </div>:<Empty icon={<Clock3/>} title="No timings yet" body="Choose a film, a restaurant and how you will travel."/>}
       </section>
-      <section className="panel"><div className="section-heading"><div><div className="eyebrow">{evaluation.valid?'ALL GOOD':'WHAT NEEDS ATTENTION'}</div><h2>{evaluation.valid?'Everything about this evening works':'Here is what to fix'}</h2></div><span className={`score-badge ${evaluation.valid?'pass':'fail'}`}>{evaluation.valid?<Check/>:`${failed.length}`}</span></div>
-        {evaluation.valid
-          ?<details className="checks-disclosure"><summary>Show the {evaluation.checks.length} checks we ran</summary><CheckGrid checks={evaluation.checks}/></details>
-          :<><CheckGrid checks={failed}/><details className="checks-disclosure"><summary>Show all {evaluation.checks.length} checks</summary><CheckGrid checks={evaluation.checks}/></details></>}
-      </section>
-      <BookingHistory plan={plan} reservations={reservations}/>
     </div>
     <aside className="cost-card"><div className="eyebrow">WHAT IT COSTS</div><h2>{money(evaluation.costs.total)}</h2><div className="budget-meter"><div className={evaluation.costs.remainingBudget!==null&&evaluation.costs.remainingBudget<0?'over':''} style={{width:`${evaluation.costs.total===null?0:Math.min(100,(evaluation.costs.total/plan.budget)*100)}%`}}/></div><div className="budget-row"><span>of {money(plan.budget)}</span><strong className={evaluation.costs.remainingBudget!==null&&evaluation.costs.remainingBudget<0?'danger':''}>{evaluation.costs.remainingBudget===null?'Not priced yet':evaluation.costs.remainingBudget>=0?`${money(evaluation.costs.remainingBudget)} left`:`${money(Math.abs(evaluation.costs.remainingBudget))} over`}</strong></div>
       {evaluation.costs.total!==null&&<div className="breakdown"><CostRow label="Dinner" value={evaluation.costs.restaurant} detail={`${plan.people} × ${money(restaurant?.pricePerPerson)}`}/><CostRow label="Film" value={evaluation.costs.movie} detail={`${plan.people} × ${money(showtime?.price)}`}/><CostRow label="Travel" value={evaluation.costs.transport} detail={transport?.name??'fare for this route'}/></div>}
@@ -262,7 +334,20 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
       :plan.status==='approved'?<button className="primary full" onClick={reserve}><ShieldCheck/> Book this evening</button>
       :<button className="primary full" disabled={!evaluation.valid} onClick={approve}><ShieldCheck/> Approve this evening</button>}
       {!immutable&&<button className="text-button full" onClick={()=>setTab('explore')}><Pencil/> Change my choices</button>}
-      <small className="fine-print">This is a controlled demo. No real restaurant, cinema, ride or payment is contacted.</small></aside></div>
+      <small className="fine-print">This is a controlled demo. No real restaurant, cinema, ride or payment is contacted.</small></aside>
+    <div className="plan-secondary">
+      <section className="panel checks-panel"><div className="section-heading"><div><div className="eyebrow">{evaluation.valid?'ALL GOOD':'WHAT NEEDS ATTENTION'}</div><h2>{evaluation.valid?'Everything about this evening works':'Here is what to fix'}</h2></div><span className={`score-badge ${evaluation.valid?'pass':'fail'}`}>{evaluation.valid?<Check/>:`${failed.length}`}</span></div>
+        {evaluation.valid
+          ?<details className="checks-disclosure"><summary>Show the {evaluation.checks.length} checks we ran</summary><CheckGrid checks={evaluation.checks}/></details>
+          // Same collapsible pattern as the valid case (open by default, so nothing here looks
+          // different today) instead of an always-expanded grid: on narrow screens this section
+          // now sits after the itinerary and the cost/approve card, and a closable <details>
+          // keeps it from dominating the screen if there are many failures to page past.
+          :<details className="checks-disclosure" open><summary>{failed.length} {failed.length===1?'thing needs':'things need'} attention</summary><CheckGrid checks={failed}/><details className="checks-disclosure"><summary>Show all {evaluation.checks.length} checks</summary><CheckGrid checks={evaluation.checks}/></details></details>}
+      </section>
+      <BookingHistory plan={plan} reservations={reservations}/>
+    </div>
+    </div>
     <details className="plan-technical"><summary>Technical details</summary><span>Plan v{plan.version} · Provider revision {evaluation.providerRevision} · State: {STATUS_WORDS[plan.status]}</span></details>
     <PlanFooter plan={plan} reservations={reservations} resetWorkspaceState={resetWorkspaceState}/>
   </>;

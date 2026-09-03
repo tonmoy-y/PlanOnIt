@@ -97,10 +97,11 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/tools.ts` — 13 imperative WebMCP definitions and handlers.
 - `src/authority.ts` — the reservation transaction boundary: the local sandbox authority (default) and a token-authenticated, server-to-server remote authority.
 - `netlify/functions/reserve.mjs` — optional server-authoritative reservation transaction.
+- `netlify/functions/auth-signup.mjs`, `auth-login.mjs`, `auth-logout.mjs`, `auth-me.mjs` — real account signup/login/logout/session-check, backed by Netlify Blobs and a signed httpOnly session cookie; `netlify/functions/_auth-shared.mjs` holds the shared scrypt hashing, cookie signing, and validation.
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
-- `tests/` — 197 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/` — 210 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, the standalone entry, and (`tests/auth.test.ts`) password hashing, session cookie signing/verification, and input validation for accounts.
 - `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
 
 ### Reset
@@ -110,6 +111,26 @@ Approval records the exact plan version and mutable provider revision. Any meani
 states plainly what it does *not* do — a reset never cancels a sandbox reservation that was already committed.
 Confirmed reservations stay in the provider ledger, and the new plan's version continues forward so it can never
 collide with a previous commitment.
+
+### Accounts
+
+The header offers real sign up / sign in / sign out, added 2026-09. `netlify/functions/auth-signup.mjs` and
+`auth-login.mjs` store one record per email in Netlify Blobs (store `planonit-users`), with the password hashed
+by Node's built-in `scrypt` (a random salt per user; the plaintext password is never stored or logged). A
+successful signup or login sets `planonit_session`, an httpOnly, Secure, SameSite=Lax cookie whose value is a
+JSON payload signed with `PLANONIT_SESSION_SECRET` (HMAC-SHA256) — there is no server-side session table, so
+`auth-me.mjs` verifies a request by re-checking that signature and the payload's expiry (30 days) rather than
+looking anything up. `auth-logout.mjs` clears the cookie. All four run as ordinary Netlify Functions and deploy
+with the rest of the site — no separate host, database signup, or extra service to provision.
+
+**What this does not do yet:** an account is an identity a person can sign into and out of; it is not yet linked
+to the planning workspace, which still works exactly as described elsewhere in this document (one shared,
+browser-local sandbox plan per origin). Attaching plan/reservation history to an account is a natural next
+step, not something this change silently assumed.
+
+**Required to deploy:** set `PLANONIT_SESSION_SECRET` (e.g. `openssl rand -base64 32`) in Netlify's dashboard
+under Site configuration → Environment variables — never in `netlify.toml` or any committed file. `.env.example`
+lists it for local `netlify dev`; copy it to `.env` (gitignored) with your own value for local testing.
 
 ## Interface
 
@@ -126,7 +147,7 @@ When an evening's date falls behind the window, the plan stops being currently v
 - Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
 - **Reservation authority.** By default the browser-local sandbox provider is its own authority, and that is what the live deployment runs. `src/authority.ts` also ships `RemoteReservationAuthority` and `netlify/functions/reserve.mjs`, which move capacity, idempotency and provider revisions to a server that re-checks every commitment and writes the ledger with a conditional `onlyIfMatch` compare-and-swap (a losing concurrent commit gets `AUTHORITY_REVISION_CONFLICT`, not a silent overwrite).
 - **The remote authority is deliberately not reachable from the browser.** It requires a bearer token, and no credential is ever read into the client bundle — anything prefixed `VITE_` is public, so shipping a shared secret there would be authentication theatre. The endpoint is therefore usable only by trusted server-side callers, is opt-in via `VITE_PLANONIT_AUTHORITY_ENDPOINT`, and is **not enabled or verified in production**. With no endpoint configured the verified local behavior runs unchanged.
-- There is no per-user identity or authentication. That is the honest architectural limit of a browser-only app, and it is why this build does not claim server-authoritative state.
+- **Accounts exist, but the planning workspace still doesn't use them.** Sign up / sign in / sign out (see "Accounts" above) are real, server-verified identity — not the mock this section used to describe. What's still true: the plan/reservation workspace itself is unchanged, stored per browser origin with no link to an account yet, which is why this build still does not claim server-authoritative *planning* state.
 - Reads (browsing inventory) are deliberately local and synchronous; only the consequential write crosses the authority boundary.
 - The mutable provider and shared workspace persist per browser origin. Same-origin tabs use a Web Locks-backed compare-and-swap boundary; stale writes fail with `CONCURRENT_WRITE_CONFLICT` or `STALE_PLAN_VERSION` and tabs converge through storage events. There is no account or cross-device server state.
 - A real deployment would move provider state, authentication, authorization, audit records, and idempotency keys to a trusted server while retaining the same interfaces.
