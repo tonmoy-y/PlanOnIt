@@ -26,17 +26,6 @@ npm run preview
 
 `npm run build` creates the normal `dist/` output that Vercel deploys and regenerates the committed root `index.html` as a single file with inlined CSS and JavaScript. The root file can therefore be opened directly without the previous `file://` asset failure.
 
-## Judge fast path
-
-1. Open the app in the supported ChatGPT built-in browser.
-2. Confirm the Goal tab's agent card now reads "Your agent can use this page" (tools are registered). The header itself carries no status pill at all - registration state shows only where it's relevant, on the Goal tab and the Activity page - and the WebMCP contract is unchanged, still exposing 13 tools to the agent.
-3. Copy the on-page request shown in the Goal tab's agent card (e.g. “Plan a [date] evening in Dhaka for 3 people under ৳5000. Use PlanOnIt's site tools, show me feasibility evidence, and leave approval to me.”) — the date is filled in automatically from the app's rolling two-week supported window, so it's always current; don't type an older date from memory.
-4. Review the resulting timeline (film → travel → dinner), nine checks, provider revision, and scaled total.
-5. Make a manual choice that breaks the plan, then ask the agent to use `repair_plan` while preserving that choice.
-6. Approve the repaired version in the UI. Approval is never available as a WebMCP tool.
-
-The **Create plan preview** button is an honest local fallback. It uses the same domain solver but is not presented as an external agent call.
-
 ## WebMCP design
 
 PlanOnIt follows the [official WebMCP guidance](https://learn.chatgpt.com/docs/webmcp): imperative top-level registration, narrow schemas, explicit side effects, runtime validation, useful verification context, and a fully usable human interface.
@@ -112,7 +101,7 @@ The supported planning window is **rolling**: it opens two days after the curren
 
 When an evening's date falls behind the window, the plan stops being currently valid — the leading check says *"This evening has passed"* — but a confirmed reservation is **not** reported as an integrity failure: it is compared against the immutable ledger record and stays committed and visible. Starting a new plan from a passed evening opens on a currently supported date.
 
-## Honest scope
+## Scope
 
 - Restaurant, cinema, route, and inventory data are controlled Dhaka sandbox data, not live commercial APIs.
 - **Reservation authority.** By default the browser-local sandbox provider is its own authority, and that is what the live deployment runs. `src/authority.ts` also ships `RemoteReservationAuthority`, an extension point for a server that re-checks every commitment and writes the ledger with a conditional `onlyIfMatch` compare-and-swap (a losing concurrent commit gets `AUTHORITY_REVISION_CONFLICT`, not a silent overwrite) — no concrete server implementation ships with this build.
@@ -125,6 +114,6 @@ When an evening's date falls behind the window, the plan stops being currently v
 
 See [the judge guide](docs/JUDGE_GUIDE.md) and [demo script](docs/DEMO_SCRIPT.md).
 
-## License
+## MIT License
 
 See [LICENSE](LICENSE).
