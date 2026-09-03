@@ -14,10 +14,9 @@ coverage/
 .eslintcache
 .cache/
 
-# Local environment files
+# Local environment files (no exceptions - .env.example's variable names now live in README.md instead)
 .env
 .env.*
-!.env.example
 *.local
 FINAL_REPORT.md
 # Logs
