@@ -8,7 +8,7 @@ import { demoProvider } from './providers';
 import { buildTools, toolNames } from './tools';
 import { Activity, ActivitySource, Plan, Preferences, Reservation, Tab, ToolError } from './types';
 import { constraintsSchema, parseInput, planningWindow } from './validation';
-import { checkLabel, formatPlanDate, peopleLabel, planStarted, STATUS_WORDS } from './labels';
+import { checkLabel, failureLabel, formatPlanDate, peopleLabel, planStarted, STATUS_WORDS } from './labels';
 
 const money=(value:number|null|undefined)=>value==null?'—':`৳${value.toLocaleString('en-IN')}`;
 const prettyTime=(value?:string)=>value?new Date(`2026-01-01T${value}:00`).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';
@@ -234,7 +234,7 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
   </>;
 
   return <><PageTitle eyebrow="CURRENT PLAN" title="Your evening, ready to verify." body={`${formatPlanDate(plan.date)} · ${peopleLabel(plan.people)} · ${movie?.title??'A film'}, then dinner at ${restaurant?.name??'a restaurant'}.`} status={statusLabel(plan,evaluation)}/>
-    {plan.status==='reservation_failed'&&<section className="repair-callout"><div><AlertTriangle/><div><div className="eyebrow">CONFIRMATION FAILED</div><h2>Your plan is safe; nothing was booked.</h2><p>{plan.reservation?.failureCode}. Review the details and approve again when ready.</p></div></div></section>}
+    {plan.status==='reservation_failed'&&<section className="repair-callout"><div><AlertTriangle/><div><div className="eyebrow">CONFIRMATION FAILED</div><h2>Your plan is safe; nothing was booked.</h2><p>{failureLabel(plan.reservation?.failureCode)}. Review the details and approve again when ready.</p></div></div></section>}
     {repaired&&<section className="repair-success"><CheckCircle2/><div><div className="eyebrow">PLAN REPAIRED</div><h2>Your evening works again.</h2><ul><li>Dinner preserved where requested</li><li>Film and travel choices recalculated</li><li>Timing and budget now work</li></ul></div></section>}
     {!evaluation.valid&&immutable&&<section className="repair-callout"><div><Lock/><div><div className="eyebrow">{plan.status==='reserved'?'BOOKING MISMATCH':'BOOKING IN PROGRESS'}</div><h2>{plan.status==='reserved'?'This booking no longer matches the plan on screen.':'Your booking is being confirmed.'}</h2><ul>{failed.map(item=><li key={item.id}><strong>{checkLabel(item)}:</strong> {item.message}</li>)}</ul><p>{immutableReason(plan)}</p></div></div></section>}
     {!evaluation.valid&&!immutable&&<section className="repair-callout"><div><AlertTriangle/><div><div className="eyebrow">NEEDS A FIX</div><h2>{failed[0]?.message??'Something in this evening does not work yet.'}</h2><ul>{failed.slice(1).map(item=><li key={item.id}><strong>{checkLabel(item)}:</strong> {item.message}</li>)}</ul><button className="text-button" onClick={()=>navigator.clipboard?.writeText(repairPrompt)}><Bot/> Copy agent repair prompt</button></div></div><div><button className="primary" onClick={quickRepair}><Wrench/> Fix this for me</button><button className="secondary" onClick={()=>setTab('explore')}><Pencil/> Change my choices</button></div></section>}
@@ -263,7 +263,7 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
       :<button className="primary full" disabled={!evaluation.valid} onClick={approve}><ShieldCheck/> Approve this evening</button>}
       {!immutable&&<button className="text-button full" onClick={()=>setTab('explore')}><Pencil/> Change my choices</button>}
       <small className="fine-print">This is a controlled demo. No real restaurant, cinema, ride or payment is contacted.</small></aside></div>
-    <details className="plan-technical"><summary>Technical details</summary><span>Plan v{plan.version} · Provider revision {evaluation.providerRevision} · State: {plan.status}</span></details>
+    <details className="plan-technical"><summary>Technical details</summary><span>Plan v{plan.version} · Provider revision {evaluation.providerRevision} · State: {STATUS_WORDS[plan.status]}</span></details>
     <PlanFooter plan={plan} reservations={reservations} resetWorkspaceState={resetWorkspaceState}/>
   </>;
 }
@@ -271,7 +271,7 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
 /** Past commitments stay visible on every screen — a booking must never disappear from view. */
 function BookingHistory({plan,reservations}:{plan:Plan;reservations:Reservation[]}){
   if(!reservations.length)return null;
-  return <section className="panel"><div className="section-heading"><div><div className="eyebrow">YOUR BOOKINGS</div><h2>Everything PlanOnIt has booked for you</h2></div><ShieldCheck/></div><div className="reservation-history">{reservations.map(item=>{const current=item.planId===plan.id&&item.version===plan.version;return <div key={item.id} className={current?'active':'superseded'}><div><strong>{item.id}</strong><span>{item.inventory.filter(record=>record.state==='committed').length} places held · {new Date(item.reservedAt).toLocaleString()}</span></div><span className={`reservation-tag ${item.status}`}>{item.status==='confirmed'?(current?'This evening':'Still booked · from an earlier plan'):item.status==='failed'?`Not booked · ${item.failureCode??'released'}`:'In progress'}</span></div>})}</div></section>;
+  return <section className="panel"><div className="section-heading"><div><div className="eyebrow">YOUR BOOKINGS</div><h2>Everything PlanOnIt has booked for you</h2></div><ShieldCheck/></div><div className="reservation-history">{reservations.map(item=>{const current=item.planId===plan.id&&item.version===plan.version;return <div key={item.id} className={current?'active':'superseded'}><div><strong>{item.id}</strong><span>{item.inventory.filter(record=>record.state==='committed').length} places held · {new Date(item.reservedAt).toLocaleString()}</span></div><span className={`reservation-tag ${item.status}`}>{item.status==='confirmed'?(current?'This evening':'Still booked · from an earlier plan'):item.status==='failed'?`Not booked · ${item.failureCode?failureLabel(item.failureCode):'released'}`:'In progress'}</span></div>})}</div></section>;
 }
 
 /** Destructive actions live away from Approve and Book, not beside them. */

@@ -23,6 +23,28 @@ export const CHECK_LABELS: Record<string,string> = {
 
 export const checkLabel=(check:FeasibilityCheck)=>CHECK_LABELS[check.id]??check.label;
 
+/**
+ * Same idea as CHECK_LABELS, for the one other place raw system vocabulary reached the
+ * person: a failed reservation's provider error code. The domain and ledger keep the code
+ * (WebMCP payloads and the audit trail depend on it); the plan screen shows this instead.
+ */
+export const FAILURE_LABELS: Record<string,string> = {
+  RESERVATION_ABANDONED: 'The previous attempt was interrupted before it finished',
+  RESERVATION_INTENT_MISMATCH: 'This evening was already booked with different details',
+  PROVIDER_UNAVAILABLE: 'The booking service was briefly unavailable',
+  PROVIDER_CONFLICT: 'The table or seats were taken just before this was confirmed',
+  AUTHORITY_UNAVAILABLE: 'The booking service was briefly unavailable',
+  AUTHORITY_MALFORMED_RESPONSE: 'The booking service sent back an unexpected response',
+  AUTHORITY_UNREACHABLE: 'The booking service could not be reached',
+  AUTHORITY_REJECTED: 'The booking service declined this reservation',
+  AUTHORITY_REVISION_CONFLICT: 'Availability changed at the same moment',
+};
+
+export const failureLabel=(code?:string):string=>{
+  if(!code)return 'Something interrupted the booking';
+  return FAILURE_LABELS[code]??(code.startsWith('AUTHORITY_HTTP_')?'The booking service returned an error':'Something interrupted the booking');
+};
+
 /** Short state word for the header strip; the long form stays on the plan page. */
 export const STATUS_WORDS: Record<PlanStatus,string> = {
   draft: 'Draft',

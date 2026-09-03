@@ -6,13 +6,13 @@ PlanOnIt is a human-controlled planning workspace where an external AI agent can
 
 **Live deployment:** <https://planonit.netlify.app/> — served over HTTPS from Netlify, built from this repository on push. `netlify.toml` holds the build, publish, function and security-header settings.
 
-> ⚠️ **The deployed site is currently behind this working tree.** Netlify builds from the last
-> pushed commit on `main`. As of the revision-5 audit the working tree carries ~900 lines of
-> committed-but-unpushed and uncommitted work (movie → travel → dinner ordering, reservation
-> ownership/integrity checks, content-bound idempotency, the reset flow, and the abandoned-
-> reservation recovery). A live check on 2026-09-02 confirmed the deployed build still renders
-> the old dinner-first itinerary. **Commit and push before submitting**, or judges opening the
-> URL will evaluate an older product than the one described here.
+> ℹ️ **Cache note.** Netlify served `/assets/*` with a one-year immutable `Cache-Control`,
+> but earlier builds gave the JS/CSS bundle the same filename on every deploy
+> (`assets/index.js`). A returning browser therefore kept the previous deploy's bundle
+> indefinitely and never saw new work land, even though `main` was up to date. As of the
+> 2026-09-03 fix, `vite.config.ts` content-hashes the built filenames, so each deploy gets a
+> new URL and this cannot happen again. If you visited the site before this fix, hard-refresh
+> once (Cmd/Ctrl+Shift+R) to drop the stale cached bundle.
 
 ## Run and verify
 
