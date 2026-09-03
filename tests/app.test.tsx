@@ -21,7 +21,7 @@ describe('shared browser workspace',()=>{
 
   it('registers real site tools and reflects their mutations in the UI',async()=>{
     await act(async()=>{root?.render(<App/>);await new Promise(resolve=>setTimeout(resolve,0));});
-    expect(registered).toHaveLength(13);expect(container.textContent).toContain('Agent-ready · 13 tools');
+    expect(registered).toHaveLength(13);expect(container.textContent).toContain('Assistant ready');
     const create=registered.find(tool=>tool.name==='create_evening_plan');expect(create).toBeDefined();
     await act(async()=>{await create?.execute({city:'Dhaka',date:'2026-09-04',people:3,budget:5000,preferences:defaultPreferences(),dinnerDurationMinutes:75,bufferMinutes:15});});
     expect(container.textContent).toContain('Ready for review');

@@ -35,7 +35,7 @@ for(const viewport of MOBILE_VIEWPORTS){
       expect(tools).toContain('create_evening_plan');
       expect(tools).toContain('start_new_plan');
       expect(tools).toHaveLength(13);
-      await expect(page.getByText('Agent-ready · 13 tools')).toBeVisible();
+      await expect(page.getByText('Assistant ready')).toBeVisible();
       await noHorizontalOverflow(page,viewport.width);
       expect(consoleErrors).toEqual([]);
     });

@@ -142,9 +142,9 @@ function Header({tab,setTab,webmcp,agentWorking}:{tab:Tab;setTab:(tab:Tab)=>void
 }
 function Brand(){return <button className="brand" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="PlanOnIt home"><span className="brandmark">P</span><span>plan<span>on</span>it</span></button>;}
 function WebMcpBadge({state,working}:{state:WebMcpState;working:boolean}){
-  const copy={registering:'Connecting tools…',active:`Agent-ready · ${toolNames.length} tools`,unavailable:'Manual mode',error:'Tool setup failed'};
+  const copy={registering:'Connecting…',active:'Assistant ready',unavailable:'Manual mode',error:'Assistant unavailable'};
   // "Working" is set only by a real registered-tool invocation. Nothing here simulates an agent.
-  const label=state==='active'&&working?'Agent working…':copy[state];
+  const label=state==='active'&&working?'Assistant working…':copy[state];
   return <div className={`webmcp-pill ${state}${working?' working':''}`} title={label} aria-live="polite"><span className="pulse"/>{label}</div>;
 }
 
@@ -348,7 +348,6 @@ function PlanView({plan,snapshot,approve,reserve,quickRepair,setTab,startNew,res
       <BookingHistory plan={plan} reservations={reservations}/>
     </div>
     </div>
-    <details className="plan-technical"><summary>Technical details</summary><span>Plan v{plan.version} · Provider revision {evaluation.providerRevision} · State: {STATUS_WORDS[plan.status]}</span></details>
     <PlanFooter plan={plan} reservations={reservations} resetWorkspaceState={resetWorkspaceState}/>
   </>;
 }
@@ -364,7 +363,7 @@ function PlanFooter({plan,reservations,resetWorkspaceState}:{plan:Plan;reservati
   return <section className="plan-footer"><ResetControl plan={plan} reservations={reservations} resetWorkspaceState={resetWorkspaceState}/></section>;
 }
 
-function ActivityView({activity,syncMessage,webmcp}:{activity:Activity[];syncMessage:string;webmcp:WebMcpState}){return <><PageTitle eyebrow="AUDIT TRAIL & AGENT GUIDE" title="One workspace, visible changes." body="Human edits, the local deterministic solver, and external WebMCP agents all write the same versioned workspace. Each row says which one acted." status={webmcp==='active'?'Agent connected':'Manual mode'}/><div className="activity-layout"><section className="panel"><div className="section-heading"><div><div className="eyebrow">VERSION HISTORY</div><h2>Recent workspace activity</h2></div><span className="live-dot">● {syncMessage}</span></div>{activity.length?<div className="activity-list">{activity.map(item=><div className="activity-row" key={item.id}><span className={`activity-avatar ${item.source}`}>{item.source==='external-agent'?<Bot/>:item.source==='quick-planner'?<RefreshCw/>:item.source==='system'?<History/>:'YOU'}</span><div><strong>{item.text}</strong><span>{item.detail} · v{item.planVersion} · {new Date(item.timestamp).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span></div></div>)}</div>:<Empty icon={<History/>} title="No edits yet" body="Agent and human changes will appear here."/>}</section><aside className="panel guide"><div className="eyebrow">AGENT GUIDE</div><h2>{toolNames.length} tools, four jobs</h2><dl><div><dt>Discover</dt><dd>restaurants, details, availability, showtimes, transport</dd></div><div><dt>Plan</dt><dd>create, inspect, validate, calculate cost</dd></div><div><dt>Collaborate</dt><dd>versioned update and signature repair</dd></div><div><dt>Confirm</dt><dd>provider-backed sandbox reservation after human approval</dd></div></dl><p>All tool inputs are strict objects. Side effects are disclosed in descriptions, stale versions fail, and approval cannot be supplied by a tool.</p></aside></div></>}
+function ActivityView({activity,syncMessage,webmcp}:{activity:Activity[];syncMessage:string;webmcp:WebMcpState}){return <><PageTitle eyebrow="AUDIT TRAIL & AGENT GUIDE" title="One workspace, visible changes." body="Human edits, the local deterministic solver, and external WebMCP agents all write the same versioned workspace. Each row says which one acted." status={webmcp==='active'?'Assistant connected':'Manual mode'}/><div className="activity-layout"><section className="panel"><div className="section-heading"><div><div className="eyebrow">VERSION HISTORY</div><h2>Recent workspace activity</h2></div><span className="live-dot">● {syncMessage}</span></div>{activity.length?<div className="activity-list">{activity.map(item=><div className="activity-row" key={item.id}><span className={`activity-avatar ${item.source}`}>{item.source==='external-agent'?<Bot/>:item.source==='quick-planner'?<RefreshCw/>:item.source==='system'?<History/>:'YOU'}</span><div><strong>{item.text}</strong><span>{item.detail} · v{item.planVersion} · {new Date(item.timestamp).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span></div></div>)}</div>:<Empty icon={<History/>} title="No edits yet" body="Agent and human changes will appear here."/>}</section><aside className="panel guide"><div className="eyebrow">AGENT GUIDE</div><h2>{toolNames.length} tools, four jobs</h2><dl><div><dt>Discover</dt><dd>restaurants, details, availability, showtimes, transport</dd></div><div><dt>Plan</dt><dd>create, inspect, validate, calculate cost</dd></div><div><dt>Collaborate</dt><dd>versioned update and signature repair</dd></div><div><dt>Confirm</dt><dd>provider-backed sandbox reservation after human approval</dd></div></dl><p>All tool inputs are strict objects. Side effects are disclosed in descriptions, stale versions fail, and approval cannot be supplied by a tool.</p></aside></div></>}
 
 /**
  * PlanOnIt-only reset with a deliberate confirmation step. It clears this app's own saved

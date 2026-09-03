@@ -37,7 +37,7 @@ npm run preview
 ## Judge fast path
 
 1. Open the app in the supported ChatGPT built-in browser.
-2. Confirm the header shows `Agent-ready · 13 tools`.
+2. Confirm the header shows `Assistant ready` (tools are registered, but the pill deliberately no longer surfaces the tool count or the word "agent" - a diner using the app does not need to know either; the WebMCP contract itself is unchanged and still exposes 13 tools to the agent).
 3. Copy the on-page request: “Plan a 2026-09-04 evening in Dhaka for 3 people under ৳5000. Use PlanOnIt's site tools, show me feasibility evidence, and leave approval to me.”
 4. Review the resulting timeline (film → travel → dinner), nine checks, provider revision, and scaled total.
 5. Make a manual choice that breaks the plan, then ask the agent to use `repair_plan` while preserving that choice.
@@ -134,7 +134,7 @@ lists it for local `netlify dev`; copy it to `.env` (gitignored) with your own v
 
 ## Interface
 
-The plan screen is written for the person, not the system. An untouched workspace shows a calm empty state rather than a list of blocking failures; feasibility checks appear under everyday names ("Table available", "Timing works") with the stable technical IDs kept in the WebMCP payloads; the itinerary shows Film → Travel → Dinner with the waiting time explained rather than implied; and the header pill reports "Agent working…" only while a registered tool is genuinely executing. `src/labels.ts` is the single place that translates system vocabulary into a diner's.
+The plan screen is written for the person, not the system. An untouched workspace shows a calm empty state rather than a list of blocking failures; feasibility checks appear under everyday names ("Table available", "Timing works") with the stable technical IDs kept in the WebMCP payloads; the itinerary shows Film → Travel → Dinner with the waiting time explained rather than implied; and the header pill reports "Assistant working…" only while a registered tool is genuinely executing, and otherwise stays free of agent/tool jargon ("Assistant ready" rather than a tool count). `src/labels.ts` is the single place that translates system vocabulary into a diner's.
 
 ## Inventory window
 
