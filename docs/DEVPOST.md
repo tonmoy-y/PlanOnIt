@@ -32,7 +32,7 @@ Before this pattern, a person either had to trust an agent's account of what it 
 - Approval is deliberately **not** a WebMCP tool. Only a real click in the UI can approve or reserve a plan — an agent can build and repair, but never approve its own work.
 - The reservation transaction is a real (sandboxed) compare-and-swap against a mutable inventory ledger: it decrements table/seat capacity atomically, is idempotent on retry, and fails closed on conflict — not just a static success response.
 - Feasibility is nine real checks re-evaluated on every read (availability, chronology, budget, route, operating hours, ownership of committed inventory, and more), so the human UI and the agent's `validate_plan` result are always the same evaluation of the same state, never two separate opinions.
-- Stack: React 19 + TypeScript + Vite on the frontend, Zod for schema validation, deployed to Netlify (static build + Netlify Functions for the optional server-authoritative reservation path). 197 automated tests cover the tools, the domain solver, the reservation lifecycle, concurrency/versioning, and adversarial input.
+- Stack: React 19 + TypeScript + Vite on the frontend, Zod for schema validation, deployed to Netlify (static build + Netlify Functions for the optional server-authoritative reservation path). 198 automated tests cover the tools, the domain solver, the reservation lifecycle, concurrency/versioning, and adversarial input.
 
 ## Try it
 

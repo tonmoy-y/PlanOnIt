@@ -100,7 +100,7 @@ Approval records the exact plan version and mutable provider revision. Any meani
 - `src/persistence.ts` — validated plan, provider, and activity persistence plus Web Locks-backed compare-and-swap and cross-tab synchronization.
 - `src/App.tsx` — agent-first human flow, manual builder, evidence center, approval, and activity guide.
 - `src/intent.ts` — canonical reservation intent, the content-bound fingerprint, and the provider ledger key.
-- `tests/` — 197 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, and the standalone entry.
+- `tests/` — 198 unit and integration tests covering each tool, UI validation, reservation transitions, the reserved-plan lifecycle, provider mutations, concurrency, the authority boundary, adversarial state attacks, the in-flight reservation race, recovery of an abandoned in-flight reservation, content-bound idempotency, reservation ownership forgeries, PlanOnIt-only reset, the standalone entry, and manual transport selection matching the same route direction the agent tools use.
 - `tests/browser/` — 21 Playwright tests (7 scenarios × 3 mobile viewports) that run the real production build in a real browser. All 21 pass in Chromium 151.
 
 ### Reset
@@ -132,7 +132,7 @@ When an evening's date falls behind the window, the plan stops being currently v
 - WebMCP availability depends on the currently supported ChatGPT built-in browser and model environment.
 - No Devpost submission or uploaded demo video is claimed.
 
-See [the judge guide](docs/JUDGE_GUIDE.md), [demo script](docs/DEMO_SCRIPT.md), [adversarial audit](docs/ADVERSARIAL_AUDIT.md), and [final report](docs/FINAL_REPORT.md).
+See [the judge guide](docs/JUDGE_GUIDE.md) and [demo script](docs/DEMO_SCRIPT.md).
 
 ## License
 
